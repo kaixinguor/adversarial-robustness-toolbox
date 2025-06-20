@@ -206,8 +206,22 @@ class DPatch(EvasionAttack):
                 patch_target.append(target_dict)
 
         for i_step in trange(self.max_iter, desc="DPatch iteration", disable=not self.verbose):
-            if i_step == 0 or (i_step + 1) % 100 == 0:
+            if i_step == 0 or (i_step + 1) % 10 == 0:
                 logger.info("Training Step: %i", i_step + 1)
+                # === 新增loss日志输出 ===
+                try:
+                    # 兼容PyTorch/TF estimator
+                    if hasattr(self.estimator, 'compute_losses'):
+                        losses = self.estimator.compute_losses(patched_images, patch_target)
+                        loss_str = ', '.join([f"{k}: {v}" for k, v in losses.items()])
+                        logger.info(f"[DPatch] Step {i_step+1} Losses: {loss_str}")
+                    elif hasattr(self.estimator, 'compute_loss'):
+                        loss = self.estimator.compute_loss(patched_images, patch_target)
+                        logger.info(f"[DPatch] Step {i_step+1} Loss: {loss}")
+                    else:
+                        logger.info(f"[DPatch] Step {i_step+1} Loss: (estimator does not support compute_loss)")
+                except Exception as e:
+                    logger.warning(f"[DPatch] Step {i_step+1} Loss logging failed: {e}")
 
             num_batches = math.ceil(x.shape[0] / self.batch_size)
             patch_gradients = np.zeros_like(self._patch)
