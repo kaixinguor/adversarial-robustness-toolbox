@@ -27,8 +27,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from art.coco_tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES
-from art.coco_tools.plot_utils import plot_image_with_boxes
+from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES
+from art.tools.plot_utils import plot_image_with_boxes
 
 """
 #################        Helper functions and labels          #################
@@ -75,7 +75,7 @@ def extract_predictions(predictions_, top_k):
 MODEL = "yolov5"  # OR yolov5
 
 
-if MODEL == "yolov3":
+if MODEL == "yolov3": ## 避坑！安装pytorchyolo会自动安装torch1.12.1版本：pytorchyolo 1.8.0 requires torch<1.13.0,>=1.10.1
 
     from pytorchyolo.utils.loss import compute_loss
     from pytorchyolo.models import load_model
@@ -94,8 +94,6 @@ if MODEL == "yolov3":
             else:
                 return self.model(x)
 
-    # model_path = "./yolov3.cfg"
-    # weights_path = "./yolov3.weights"
     model_path = "models/PyTorch-YOLOv3/yolov3.cfg"
     weights_path = "models/PyTorch-YOLOv3/yolov3.weights"
     model = load_model(model_path=model_path, weights_path=weights_path)

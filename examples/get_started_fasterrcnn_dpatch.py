@@ -31,111 +31,16 @@ import logging
 from art.estimators.object_detection import PyTorchFasterRCNN
 from art.attacks.evasion import DPatch
 
+from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES
+from art.tools.plot_utils import plot_image_with_boxes
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     handlers=[logging.StreamHandler()]
 )
 
-COCO_INSTANCE_CATEGORY_NAMES = [
-    "__background__",
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "airplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "N/A",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "N/A",
-    "backpack",
-    "umbrella",
-    "N/A",
-    "N/A",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "N/A",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "N/A",
-    "dining table",
-    "N/A",
-    "N/A",
-    "toilet",
-    "N/A",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "N/A",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-]
-
-
 def extract_predictions(predictions_):
-
-    # for key, item in predictions[0].items():
-    #     print(key, item)
 
     # Get the predicted class
     predictions_class = [COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(predictions_["labels"])]
@@ -154,49 +59,9 @@ def extract_predictions(predictions_):
 
     predictions_boxes = predictions_boxes[: predictions_t + 1]
     predictions_class = predictions_class[: predictions_t + 1]
+    predictions_score = predictions_score[: predictions_t + 1]
 
-    return predictions_class, predictions_boxes, predictions_class
-
-
-def plot_image_with_boxes(img, boxes, pred_cls, scores=None, class_names=None, save_path=None, title=None):
-    plt.figure(figsize=(12, 12))
-    ax = plt.gca()
-    ax.imshow(img.astype(np.uint8), interpolation="nearest")
-    colors = [
-        'red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray',
-        'cyan', 'magenta', 'yellow', 'lime', 'teal', 'gold', 'navy', 'maroon'
-    ]
-    for i in range(len(boxes)):
-        color = colors[i % len(colors)]
-        box = boxes[i]
-        rect = patches.Rectangle(
-            (int(box[0][0]), int(box[0][1])),
-            int(box[1][0] - box[0][0]),
-            int(box[1][1] - box[0][1]),
-            linewidth=3, edgecolor=color, facecolor='none', alpha=0.8
-        )
-        ax.add_patch(rect)
-        # 标签内容
-        label = pred_cls[i] if class_names is None else class_names[pred_cls[i]] if isinstance(pred_cls[i], int) else pred_cls[i]
-        if scores is not None:
-            label = f"{label} ({scores[i]:.2f})"
-        ax.text(
-            int(box[0][0]), int(box[0][1]) - 10,
-            label,
-            fontsize=14, color='white', weight='bold',
-            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7)
-        )
-    if title:
-        plt.title(title, fontsize=16, weight='bold')
-    plt.axis("off")
-    plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()
-
-
+    return predictions_class, predictions_boxes, predictions_score
 def get_loss(frcnn, x, y):
     frcnn._model.train()
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -353,15 +218,13 @@ if __name__ == "__main__":
 
     for i in range(image.shape[0]):
         print(f"\nPredictions clean image {i}:")
-        predictions_class, predictions_boxes, _ = extract_predictions(y[i])
+        predictions_class, predictions_boxes, predictions_score = extract_predictions(y[i])
         plot_image_with_boxes(
             img=x[i].copy(),
             boxes=predictions_boxes,
             pred_cls=predictions_class,
-            save_path=os.path.join(config["path"], f"clean_example_{i}.png"),
-            class_names=COCO_INSTANCE_CATEGORY_NAMES,
-            scores=list(y[i]["scores"]) if "scores" in y[i] else None,
-            title="Original Image (Detection)"
+            title="Original Image (Detection)",
+            scores=list(y[i]["scores"]) if "scores" in y[i] else None
         )
 
     for i, y_i in enumerate(y):
@@ -396,15 +259,13 @@ if __name__ == "__main__":
 
     for i in range(image.shape[0]):
         print("\nPredictions adversarial image {}:".format(i))
-        predictions_adv_class, predictions_adv_boxes, predictions_adv_class = extract_predictions(predictions_adv[i])
+        predictions_adv_class, predictions_adv_boxes, predictions_adv_score = extract_predictions(predictions_adv[i])
         plot_image_with_boxes(
             img=x_patch[i].copy(),
             boxes=predictions_adv_boxes,
             pred_cls=predictions_adv_class,
-            save_path=os.path.join(config["path"], f"adversarial_example_{i}.png"),
-            class_names=COCO_INSTANCE_CATEGORY_NAMES,
-            scores=list(predictions_adv[i]["scores"]) if "scores" in predictions_adv[i] else None,
-            title="Patched Image (Detection)"
+            title="Patched Image (Detection)",
+            scores=predictions_adv_score
         )
         # 保存对比图
         visualize_attack_comparison(
