@@ -27,94 +27,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+from art.coco_tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES
+from art.coco_tools.plot_utils import plot_image_with_boxes
 
 """
 #################        Helper functions and labels          #################
 """
-
-COCO_INSTANCE_CATEGORY_NAMES = [
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "airplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "backpack",
-    "umbrella",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "dining table",
-    "toilet",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-]
-
 
 def extract_predictions(predictions_, top_k):
     # Get the predicted class
@@ -151,57 +69,6 @@ def extract_predictions(predictions_, top_k):
     return predictions_class, predictions_boxes, predictions_scores
 
 
-def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
-    """
-    Plot image with bounding boxes and labels using improved styling.
-    
-    Args:
-        img: Input image as numpy array
-        boxes: List of bounding boxes in format [[(x1, y1), (x2, y2)], ...]
-        pred_cls: List of predicted class names
-        title: Title for the plot
-        scores: Optional list of confidence scores
-    """
-    # Define colors for different classes
-    colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 
-              'cyan', 'magenta', 'yellow', 'lime', 'navy', 'teal', 'maroon', 'olive']
-    
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-    ax.imshow(img.astype(np.uint8))
-    ax.set_title(title, fontsize=16, weight='bold', pad=20)
-    ax.axis('off')
-    
-    for i in range(len(boxes)):
-        # Extract box coordinates
-        x1, y1 = boxes[i][0]
-        x2, y2 = boxes[i][1]
-        
-        # Get class name and score
-        class_name = pred_cls[i]
-        score_text = ""
-        if scores is not None and i < len(scores):
-            score_text = f" ({scores[i]:.2f})"
-        
-        # Choose color based on class (cycle through colors)
-        color = colors[i % len(colors)]
-        
-        # Draw bounding box using matplotlib patches
-        rect = patches.Rectangle(
-            (x1, y1), x2 - x1, y2 - y1,
-            linewidth=3, edgecolor=color, facecolor='none'
-        )
-        ax.add_patch(rect)
-        
-        # Add label with improved styling
-        label_text = f"{class_name}{score_text}"
-        ax.text(x1, y1 - 10, label_text, 
-                bbox=dict(boxstyle="round,pad=0.5", facecolor=color, alpha=0.8),
-                fontsize=12, color='white', weight='bold')
-    
-    plt.tight_layout()
-    plt.show()
-
-
 """
 #################        Model definition        #################
 """
@@ -229,8 +96,8 @@ if MODEL == "yolov3":
 
     # model_path = "./yolov3.cfg"
     # weights_path = "./yolov3.weights"
-    model_path = "/tmp/PyTorch-YOLOv3/config/yolov3.cfg"
-    weights_path = "/tmp/PyTorch-YOLOv3/weights/yolov3.weights"
+    model_path = "models/PyTorch-YOLOv3/yolov3.cfg"
+    weights_path = "models/PyTorch-YOLOv3/yolov3.weights"
     model = load_model(model_path=model_path, weights_path=weights_path)
 
     model = Yolo(model)
@@ -270,7 +137,7 @@ elif MODEL == "yolov5":
             else:
                 return self.model(x)
 
-    model = yolov5.load("yolov5s.pt")
+    model = yolov5.load("models/yolov5/yolov5s.pt")
 
     model = Yolo(model)
 
