@@ -25,6 +25,7 @@ from art.attacks.evasion import ProjectedGradientDescent
 import cv2
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 """
@@ -150,36 +151,54 @@ def extract_predictions(predictions_, top_k):
     return predictions_class, predictions_boxes, predictions_scores
 
 
-def plot_image_with_boxes(img, boxes, pred_cls, title):
-    text_size = 2
-    text_th = 2
-    rect_th = 2
-
-    img = img.copy()
-
+def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
+    """
+    Plot image with bounding boxes and labels using improved styling.
+    
+    Args:
+        img: Input image as numpy array
+        boxes: List of bounding boxes in format [[(x1, y1), (x2, y2)], ...]
+        pred_cls: List of predicted class names
+        title: Title for the plot
+        scores: Optional list of confidence scores
+    """
+    # Define colors for different classes
+    colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 
+              'cyan', 'magenta', 'yellow', 'lime', 'navy', 'teal', 'maroon', 'olive']
+    
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax.imshow(img.astype(np.uint8))
+    ax.set_title(title, fontsize=16, weight='bold', pad=20)
+    ax.axis('off')
+    
     for i in range(len(boxes)):
-        cv2.rectangle(
-            img,
-            (int(boxes[i][0][0]), int(boxes[i][0][1])),
-            (int(boxes[i][1][0]), int(boxes[i][1][1])),
-            color=(0, 255, 0),
-            thickness=rect_th,
+        # Extract box coordinates
+        x1, y1 = boxes[i][0]
+        x2, y2 = boxes[i][1]
+        
+        # Get class name and score
+        class_name = pred_cls[i]
+        score_text = ""
+        if scores is not None and i < len(scores):
+            score_text = f" ({scores[i]:.2f})"
+        
+        # Choose color based on class (cycle through colors)
+        color = colors[i % len(colors)]
+        
+        # Draw bounding box using matplotlib patches
+        rect = patches.Rectangle(
+            (x1, y1), x2 - x1, y2 - y1,
+            linewidth=3, edgecolor=color, facecolor='none'
         )
-        # Write the prediction class
-        cv2.putText(
-            img,
-            pred_cls[i],
-            (int(boxes[i][0][0]), int(boxes[i][0][1])),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            text_size,
-            (0, 255, 0),
-            thickness=text_th,
-        )
-
-    plt.figure()
-    plt.axis("off")
-    plt.title(title)
-    plt.imshow(img.astype(np.uint8), interpolation="nearest")
+        ax.add_patch(rect)
+        
+        # Add label with improved styling
+        label_text = f"{class_name}{score_text}"
+        ax.text(x1, y1 - 10, label_text, 
+                bbox=dict(boxstyle="round,pad=0.5", facecolor=color, alpha=0.8),
+                fontsize=12, color='white', weight='bold')
+    
+    plt.tight_layout()
     plt.show()
 
 
@@ -256,15 +275,18 @@ elif MODEL == "yolov5":
     model = Yolo(model)
 
     detector = PyTorchYolo(
-        model=model, device_type="cpu", input_shape=(3, 640, 640), clip_values=(0, 255), attack_losses=("loss_total",)
+        model=model, device_type="gpu", input_shape=(3, 640, 640), clip_values=(0, 255), attack_losses=("loss_total",)
     )
 
 
 """
 #################        Example image        #################
 """
-response = requests.get("https://ultralytics.com/images/zidane.jpg")
-img = np.asarray(Image.open(BytesIO(response.content)).resize((640, 640)))
+# response = requests.get("https://ultralytics.com/images/zidane.jpg")
+# img = np.asarray(Image.open(BytesIO(response.content)).resize((640, 640)))
+
+local_img_path = "dataset/vehicle_images_5/images/000000000471.jpg"
+img = np.asarray(Image.open(local_img_path).resize((640, 640)))
 image = np.stack([img], axis=0).astype(np.float32)
 image_chw = np.transpose(image, (0, 3, 1, 2))
 
@@ -286,9 +308,10 @@ plt.imshow(image_adv[0].astype(np.uint8), interpolation="nearest")
 plt.show()
 
 predictions = detector.predict(x=image_chw)
-predictions_class, predictions_boxes, _ = extract_predictions(predictions[0], top_k=3)
+predictions_class, predictions_boxes, predictions_scores = extract_predictions(predictions[0], top_k=3)
 plot_image_with_boxes(
-    img=image[0], boxes=predictions_boxes, pred_cls=predictions_class, title="Predictions on original image"
+    img=image[0], boxes=predictions_boxes, pred_cls=predictions_class, 
+    title="Predictions on original image", scores=predictions_scores
 )
 
 predictions = detector.predict(image_adv_chw)
@@ -298,4 +321,5 @@ plot_image_with_boxes(
     boxes=predictions_boxes,
     pred_cls=predictions_class,
     title="Predictions on adversarial image",
+    scores=d
 )

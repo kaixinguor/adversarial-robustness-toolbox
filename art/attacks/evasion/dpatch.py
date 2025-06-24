@@ -26,14 +26,18 @@ import logging
 import math
 import random
 from typing import TYPE_CHECKING
+import os
+import json
 
 import numpy as np
 from tqdm.auto import trange
+import matplotlib.pyplot as plt
 
 from art.attacks.attack import EvasionAttack
 from art.estimators.estimator import BaseEstimator, LossGradientsMixin
 from art.estimators.object_detection.object_detector import ObjectDetectorMixin
 from art import config
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
     from art.utils import OBJECT_DETECTOR_TYPE
@@ -63,9 +67,10 @@ class DPatch(EvasionAttack):
         estimator: "OBJECT_DETECTOR_TYPE",
         patch_shape: tuple[int, int, int] = (40, 40, 3),
         learning_rate: float = 5.0,
-        max_iter: int = 500,
+        max_iter: int = 100,
         batch_size: int = 16,
         verbose: bool = True,
+        log_dir: str = None,
     ):
         """
         Create an instance of the :class:`.DPatch`.
@@ -76,6 +81,7 @@ class DPatch(EvasionAttack):
         :param max_iter: The number of optimization steps.
         :param batch_size: The size of the training batch.
         :param verbose: Show progress bars.
+        :param log_dir: Directory to save TensorBoard logs.
         """
         super().__init__(estimator=estimator)
 
@@ -97,6 +103,10 @@ class DPatch(EvasionAttack):
             ).astype(config.ART_NUMPY_DTYPE)
 
         self.target_label: int | np.ndarray | list[int] | None = []
+        self.writer = None
+        if log_dir is not None:
+            os.makedirs(log_dir, exist_ok=True)
+            self.writer = SummaryWriter(log_dir=log_dir)
 
     def generate(
         self,
@@ -208,21 +218,14 @@ class DPatch(EvasionAttack):
         for i_step in trange(self.max_iter, desc="DPatch iteration", disable=not self.verbose):
             if i_step == 0 or (i_step + 1) % 10 == 0:
                 logger.info("Training Step: %i", i_step + 1)
-                # === 新增loss日志输出 ===
-                try:
-                    # 兼容PyTorch/TF estimator
-                    if hasattr(self.estimator, 'compute_losses'):
-                        losses = self.estimator.compute_losses(patched_images, patch_target)
-                        loss_str = ', '.join([f"{k}: {v}" for k, v in losses.items()])
-                        logger.info(f"[DPatch] Step {i_step+1} Losses: {loss_str}")
-                    elif hasattr(self.estimator, 'compute_loss'):
-                        loss = self.estimator.compute_loss(patched_images, patch_target)
-                        logger.info(f"[DPatch] Step {i_step+1} Loss: {loss}")
-                    else:
-                        logger.info(f"[DPatch] Step {i_step+1} Loss: (estimator does not support compute_loss)")
-                except Exception as e:
-                    logger.warning(f"[DPatch] Step {i_step+1} Loss logging failed: {e}")
 
+                losses = self.estimator.compute_losses(patched_images, patch_target)
+                loss_str = ', '.join([f"{k}: {v}" for k, v in losses.items()])
+                logger.info(f"[DPatch] Step {i_step+1} Losses: {loss_str}")
+                if self.writer is not None:
+                    for k, v in losses.items():
+                        self.writer.add_scalar(f"Loss/{k}", v, i_step+1)
+                   
             num_batches = math.ceil(x.shape[0] / self.batch_size)
             patch_gradients = np.zeros_like(self._patch)
 
@@ -419,3 +422,7 @@ class DPatch(EvasionAttack):
 
         if not isinstance(self.verbose, bool):
             raise ValueError("The argument `verbose` has to be of type bool.")
+
+    def close(self):
+        if self.writer is not None:
+            self.writer.close()

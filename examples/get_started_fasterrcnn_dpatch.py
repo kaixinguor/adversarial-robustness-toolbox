@@ -25,10 +25,17 @@ import argparse
 import json
 import yaml
 import pprint
+import matplotlib.patches as patches
+import logging
 
 from art.estimators.object_detection import PyTorchFasterRCNN
 from art.attacks.evasion import DPatch
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[logging.StreamHandler()]
+)
 
 COCO_INSTANCE_CATEGORY_NAMES = [
     "__background__",
@@ -151,35 +158,41 @@ def extract_predictions(predictions_):
     return predictions_class, predictions_boxes, predictions_class
 
 
-def plot_image_with_boxes(img, boxes, pred_cls, save_path=None):
-    text_size = 5
-    text_th = 5
-    rect_th = 6
-
+def plot_image_with_boxes(img, boxes, pred_cls, scores=None, class_names=None, save_path=None, title=None):
+    plt.figure(figsize=(12, 12))
+    ax = plt.gca()
+    ax.imshow(img.astype(np.uint8), interpolation="nearest")
+    colors = [
+        'red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray',
+        'cyan', 'magenta', 'yellow', 'lime', 'teal', 'gold', 'navy', 'maroon'
+    ]
     for i in range(len(boxes)):
-        # Draw Rectangle with the coordinates
-
-        cv2.rectangle(
-            img,
-            (int(boxes[i][0][0]), int(boxes[i][0][1])),
-            (int(boxes[i][1][0]), int(boxes[i][1][1])),
-            color=(0, 255, 0),
-            thickness=rect_th,
+        color = colors[i % len(colors)]
+        box = boxes[i]
+        rect = patches.Rectangle(
+            (int(box[0][0]), int(box[0][1])),
+            int(box[1][0] - box[0][0]),
+            int(box[1][1] - box[0][1]),
+            linewidth=3, edgecolor=color, facecolor='none', alpha=0.8
         )
-        # Write the prediction class
-        cv2.putText(
-            img,
-            pred_cls[i],
-            (int(boxes[i][0][0]), int(boxes[i][0][1])),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            text_size,
-            (0, 255, 0),
-            thickness=text_th,
+        ax.add_patch(rect)
+        # 标签内容
+        label = pred_cls[i] if class_names is None else class_names[pred_cls[i]] if isinstance(pred_cls[i], int) else pred_cls[i]
+        if scores is not None:
+            label = f"{label} ({scores[i]:.2f})"
+        ax.text(
+            int(box[0][0]), int(box[0][1]) - 10,
+            label,
+            fontsize=14, color='white', weight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7)
         )
+    if title:
+        plt.title(title, fontsize=16, weight='bold')
     plt.axis("off")
-    plt.imshow(img.astype(np.uint8), interpolation="nearest")
+    plt.tight_layout()
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
     else:
         plt.show()
 
@@ -206,6 +219,84 @@ def append_loss_history(loss_history, output):
     for loss in ["loss_classifier", "loss_box_reg", "loss_objectness", "loss_rpn_box_reg"]:
         loss_history[loss] += [output[loss]]
     return loss_history
+
+
+def visualize_patch_only(adversarial_patch: np.ndarray, save_path: str = None):
+    if adversarial_patch.shape[0] == 3 and adversarial_patch.shape[-1] != 3:
+        patch_rgb = np.transpose(adversarial_patch, (1, 2, 0))
+    else:
+        patch_rgb = adversarial_patch
+    patch_rgb = np.clip(patch_rgb, 0, 255).astype(np.uint8)
+    plt.figure(figsize=(6, 6))
+    plt.imshow(patch_rgb)
+    plt.title('Generated Adversarial Patch', fontsize=14, weight='bold')
+    plt.axis('off')
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+
+def visualize_attack_comparison(clean_img, clean_boxes, clean_cls, adv_img, adv_boxes, adv_cls, class_names=None, clean_scores=None, adv_scores=None, save_path=None):
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8))
+    # 原图
+    axes[0].imshow(clean_img.astype(np.uint8))
+    axes[0].set_title('Original Image (Detection)', fontsize=16, weight='bold')
+    axes[0].axis('off')
+    colors = [
+        'red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray',
+        'cyan', 'magenta', 'yellow', 'lime', 'teal', 'gold', 'navy', 'maroon'
+    ]
+    for i in range(len(clean_boxes)):
+        color = colors[i % len(colors)]
+        box = clean_boxes[i]
+        rect = patches.Rectangle(
+            (int(box[0][0]), int(box[0][1])),
+            int(box[1][0] - box[0][0]),
+            int(box[1][1] - box[0][1]),
+            linewidth=3, edgecolor=color, facecolor='none', alpha=0.8
+        )
+        axes[0].add_patch(rect)
+        label = clean_cls[i] if class_names is None else class_names[clean_cls[i]] if isinstance(clean_cls[i], int) else clean_cls[i]
+        if clean_scores is not None:
+            label = f"{label} ({clean_scores[i]:.2f})"
+        axes[0].text(
+            int(box[0][0]), int(box[0][1]) - 10,
+            label,
+            fontsize=14, color='white', weight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7)
+        )
+    # 攻击后
+    axes[1].imshow(adv_img.astype(np.uint8))
+    axes[1].set_title('Patched Image (Detection)', fontsize=16, weight='bold')
+    axes[1].axis('off')
+    for i in range(len(adv_boxes)):
+        color = colors[i % len(colors)]
+        box = adv_boxes[i]
+        rect = patches.Rectangle(
+            (int(box[0][0]), int(box[0][1])),
+            int(box[1][0] - box[0][0]),
+            int(box[1][1] - box[0][1]),
+            linewidth=3, edgecolor=color, facecolor='none', alpha=0.8
+        )
+        axes[1].add_patch(rect)
+        label = adv_cls[i] if class_names is None else class_names[adv_cls[i]] if isinstance(adv_cls[i], int) else adv_cls[i]
+        if adv_scores is not None:
+            label = f"{label} ({adv_scores[i]:.2f})"
+        axes[1].text(
+            int(box[0][0]), int(box[0][1]) - 10,
+            label,
+            fontsize=14, color='white', weight='bold',
+            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7)
+        )
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -252,7 +343,8 @@ if __name__ == "__main__":
     image = np.stack([image_1], axis=0).astype(np.float32)
 
     attack = DPatch(
-        frcnn
+        frcnn,
+        log_dir="results/dpatch_fasterrcnn/log"
     )
 
     x = image.copy()
@@ -267,6 +359,9 @@ if __name__ == "__main__":
             boxes=predictions_boxes,
             pred_cls=predictions_class,
             save_path=os.path.join(config["path"], f"clean_example_{i}.png"),
+            class_names=COCO_INSTANCE_CATEGORY_NAMES,
+            scores=list(y[i]["scores"]) if "scores" in y[i] else None,
+            title="Original Image (Detection)"
         )
 
     for i, y_i in enumerate(y):
@@ -301,14 +396,49 @@ if __name__ == "__main__":
 
     for i in range(image.shape[0]):
         print("\nPredictions adversarial image {}:".format(i))
-
-        # Process predictions
         predictions_adv_class, predictions_adv_boxes, predictions_adv_class = extract_predictions(predictions_adv[i])
-
-        # Plot predictions
         plot_image_with_boxes(
             img=x_patch[i].copy(),
             boxes=predictions_adv_boxes,
             pred_cls=predictions_adv_class,
             save_path=os.path.join(config["path"], f"adversarial_example_{i}.png"),
+            class_names=COCO_INSTANCE_CATEGORY_NAMES,
+            scores=list(predictions_adv[i]["scores"]) if "scores" in predictions_adv[i] else None,
+            title="Patched Image (Detection)"
         )
+        # 保存对比图
+        visualize_attack_comparison(
+            clean_img=x[i].copy(),
+            clean_boxes=predictions_boxes,
+            clean_cls=predictions_class,
+            adv_img=x_patch[i].copy(),
+            adv_boxes=predictions_adv_boxes,
+            adv_cls=predictions_adv_class,
+            class_names=COCO_INSTANCE_CATEGORY_NAMES,
+            clean_scores=list(y[i]["scores"]) if "scores" in y[i] else None,
+            adv_scores=list(predictions_adv[i]["scores"]) if "scores" in predictions_adv[i] else None,
+            save_path=os.path.join(config["path"], f"attack_comparison_{i}.png")
+        )
+
+    # 在攻击前保存patch可视化
+    patch_vis_path = os.path.join(config["path"], "patch_visualization.png")
+    visualize_patch_only(attack._patch, save_path=patch_vis_path)
+
+    # 训练后绘制loss曲线
+    loss_history_path = os.path.join(config["path"], "loss_history.json")
+    with open(loss_history_path, "r") as f:
+        loss_history = json.load(f)
+
+    plt.figure(figsize=(10, 6))
+    for loss_name, loss_values in loss_history.items():
+        plt.plot(loss_values, label=loss_name)
+    plt.xlabel("Iteration")
+    plt.ylabel("Loss Value")
+    plt.title("DPatch Training Loss Curve")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(config["path"], "loss_curve.png"))
+    plt.show()
+
+    attack.close()

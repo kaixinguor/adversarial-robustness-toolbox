@@ -28,6 +28,7 @@ import pprint
 
 from art.estimators.object_detection import PyTorchFasterRCNN
 from art.attacks.evasion import RobustDPatch
+import matplotlib.patches as patches
 
 
 COCO_INSTANCE_CATEGORY_NAMES = [
@@ -147,37 +148,88 @@ def extract_predictions(predictions_):
 
     predictions_boxes = predictions_boxes[: predictions_t + 1]
     predictions_class = predictions_class[: predictions_t + 1]
+    predictions_score = predictions_score[: predictions_t + 1]
 
-    return predictions_class, predictions_boxes, predictions_class
+    return predictions_class, predictions_boxes, predictions_score
 
 
-def plot_image_with_boxes(img, boxes, pred_cls):
-    text_size = 5
-    text_th = 5
-    rect_th = 6
+# def plot_image_with_boxes(img, boxes, pred_cls):
+#     text_size = 5
+#     text_th = 5
+#     rect_th = 6
 
+#     for i in range(len(boxes)):
+#         # Draw Rectangle with the coordinates
+
+#         cv2.rectangle(
+#             img,
+#             (int(boxes[i][0][0]), int(boxes[i][0][1])),
+#             (int(boxes[i][1][0]), int(boxes[i][1][1])),
+#             color=(0, 255, 0),
+#             thickness=rect_th,
+#         )
+#         # Write the prediction class
+#         cv2.putText(
+#             img,
+#             pred_cls[i],
+#             (int(boxes[i][0][0]), int(boxes[i][0][1])),
+#             cv2.FONT_HERSHEY_SIMPLEX,
+#             text_size,
+#             (0, 255, 0),
+#             thickness=text_th,
+#         )
+#     plt.axis("off")
+#     plt.imshow(img.astype(np.uint8), interpolation="nearest")
+#     plt.show()
+
+def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
+    """
+    Plot image with bounding boxes and labels using improved styling.
+    
+    Args:
+        img: Input image as numpy array
+        boxes: List of bounding boxes in format [[(x1, y1), (x2, y2)], ...]
+        pred_cls: List of predicted class names
+        title: Title for the plot
+        scores: Optional list of confidence scores
+    """
+    # Define colors for different classes
+    colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 
+              'cyan', 'magenta', 'yellow', 'lime', 'navy', 'teal', 'maroon', 'olive']
+    
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax.imshow(img.astype(np.uint8))
+    ax.set_title(title, fontsize=16, weight='bold', pad=20)
+    ax.axis('off')
+    
     for i in range(len(boxes)):
-        # Draw Rectangle with the coordinates
-
-        cv2.rectangle(
-            img,
-            (int(boxes[i][0][0]), int(boxes[i][0][1])),
-            (int(boxes[i][1][0]), int(boxes[i][1][1])),
-            color=(0, 255, 0),
-            thickness=rect_th,
+        # Extract box coordinates
+        x1, y1 = boxes[i][0]
+        x2, y2 = boxes[i][1]
+        
+        # Get class name and score
+        class_name = pred_cls[i]
+        score_text = ""
+        if scores is not None and i < len(scores):
+            score_text = f" ({scores[i]:.2f})"
+        
+        # Choose color based on class (cycle through colors)
+        color = colors[i % len(colors)]
+        
+        # Draw bounding box using matplotlib patches
+        rect = patches.Rectangle(
+            (x1, y1), x2 - x1, y2 - y1,
+            linewidth=3, edgecolor=color, facecolor='none'
         )
-        # Write the prediction class
-        cv2.putText(
-            img,
-            pred_cls[i],
-            (int(boxes[i][0][0]), int(boxes[i][0][1])),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            text_size,
-            (0, 255, 0),
-            thickness=text_th,
-        )
-    plt.axis("off")
-    plt.imshow(img.astype(np.uint8), interpolation="nearest")
+        ax.add_patch(rect)
+        
+        # Add label with improved styling
+        label_text = f"{class_name}{score_text}"
+        ax.text(x1, y1 - 10, label_text, 
+                bbox=dict(boxstyle="round,pad=0.5", facecolor=color, alpha=0.8),
+                fontsize=12, color='white', weight='bold')
+    
+    plt.tight_layout()
     plt.show()
 
 
@@ -217,16 +269,16 @@ if __name__ == "__main__":
         config = {
             "attack_losses": ["loss_classifier", "loss_box_reg", "loss_objectness", "loss_rpn_box_reg"],
             "cuda_visible_devices": "1",
-            "patch_shape": [450, 450, 3],
-            "patch_location": [600, 750],
+            "patch_shape": [40, 40, 3],
+            "patch_location": [60, 75],
             "crop_range": [0, 0],
             "brightness_range": [1.0, 1.0],
             "rotation_weights": [1, 0, 0, 0],
             "sample_size": 1,
             "learning_rate": 1.0,
-            "max_iter": 5000,
+            "max_iter": 10,
             "batch_size": 1,
-            "image_file": "banner-diverse-group-of-people-2.jpg",
+            "image_file": "dataset/vehicle_images_5/images/000000000471.jpg",
             "resume": False,
             "path": "",
         }
@@ -300,7 +352,11 @@ if __name__ == "__main__":
         print("\nPredictions adversarial image {}:".format(i))
 
         # Process predictions
-        predictions_adv_class, predictions_adv_boxes, predictions_adv_class = extract_predictions(predictions_adv[i])
+        predictions_adv_class, predictions_adv_boxes, predictions_adv_score = extract_predictions(predictions_adv[i])
 
         # Plot predictions
-        plot_image_with_boxes(img=x_patch[i].copy(), boxes=predictions_adv_boxes, pred_cls=predictions_adv_class)
+        plot_image_with_boxes(img=x_patch[i].copy(), 
+                              boxes=predictions_adv_boxes, 
+                              pred_cls=predictions_adv_class,
+                              title="xx",
+                              scores=predictions_adv_score)
