@@ -65,9 +65,9 @@ class DPatch(EvasionAttack):
     def __init__(
         self,
         estimator: "OBJECT_DETECTOR_TYPE",
-        patch_shape: tuple[int, int, int] = (3, 40, 40),
+        patch_shape: tuple[int, int, int] = (40, 40, 3),
         learning_rate: float = 5.0,
-        max_iter: int = 10,
+        max_iter: int = 1,
         batch_size: int = 16,
         verbose: bool = True,
         log_dir: str = None,
@@ -85,15 +85,23 @@ class DPatch(EvasionAttack):
         """
         super().__init__(estimator=estimator)
 
+        # 设置对抗补丁的形状
         self.patch_shape = patch_shape
+        # 设置优化算法的学习率
         self.learning_rate = learning_rate
+        # 设置优化算法的最大迭代次数
         self.max_iter = max_iter
+        # 设置训练批次的大小
         self.batch_size = batch_size
+        # 设置是否显示进度条
         self.verbose = verbose
+        # 检查参数是否合法
         self._check_params()
 
+        # 如果估计器的裁剪值是None，则将对抗补丁初始化为全零
         if self.estimator.clip_values is None:
             self._patch = np.zeros(shape=patch_shape, dtype=config.ART_NUMPY_DTYPE)
+        # 否则，将对抗补丁初始化为随机值，范围在估计器的裁剪值之间
         else:
             self._patch = (
                 np.random.randint(0, 255, size=patch_shape)
@@ -102,7 +110,9 @@ class DPatch(EvasionAttack):
                 + self.estimator.clip_values[0]
             ).astype(config.ART_NUMPY_DTYPE)
 
+        # 设置目标标签
         self.target_label: int | np.ndarray | list[int] | None = []
+        # 设置TensorBoard日志写入器
         self.writer = None
         if log_dir is not None:
             os.makedirs(log_dir, exist_ok=True)

@@ -24,7 +24,7 @@ def save_trained_patch(patch: np.ndarray, save_dir: str, save_name: str) -> str:
     # Save as .png file for visualization
     patch_png_path = os.path.join(save_dir, f'{save_name}.png')
     patch_png = patch.astype(np.uint8)
-    patch_png = np.transpose(patch_png, (1, 2, 0))  # [C,H,W] -> [H,W,C]
+    # patch_png = np.transpose(patch_png, (1, 2, 0))  # [C,H,W] -> [H,W,C]
     patch_png = patch_png[..., ::-1]  # BGR to RGB
     patch_png = Image.fromarray(patch_png)
     patch_png.save(patch_png_path)

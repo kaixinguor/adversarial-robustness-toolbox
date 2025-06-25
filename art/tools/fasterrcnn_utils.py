@@ -1,4 +1,5 @@
 import torchvision
+import torch
 def extract_predictions(predictions_, class_names):
 
     # Get the predicted class

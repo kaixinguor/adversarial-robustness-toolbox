@@ -87,7 +87,7 @@ def process_image_file(
     # Convert to numpy array and change to BGR format
     image_array = np.array(image).astype(np.float32)  # RGB [H,W,C]
     image_array = image_array[..., ::-1]  # Convert RGB to BGR
-    image_array = np.transpose(image_array, (2, 0, 1))  # Shape: [C,H,W], range [0.0,255.0]
+    # image_array = np.transpose(image_array, (2, 0, 1))  # Shape: [C,H,W], range [0.0,255.0]
     
     # Process annotations for this image
     annotations = file_to_annotations.get(filename, [])

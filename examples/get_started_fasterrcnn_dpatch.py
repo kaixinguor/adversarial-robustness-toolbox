@@ -162,7 +162,7 @@ if __name__ == "__main__":
         os.environ["CUDA_VISIBLE_DEVICES"] = config["cuda_visible_devices"]
 
     frcnn = PyTorchFasterRCNN(
-        clip_values=(0, 255), channels_first=True, attack_losses=config["attack_losses"], device_type=device_type
+        clip_values=(0, 255), channels_first=False, attack_losses=config["attack_losses"], device_type=device_type
     )
 
     attack = DPatch(
@@ -193,6 +193,12 @@ if __name__ == "__main__":
         print("Iteration:", i)
         patch = attack.generate(image_batch)
         x_patch = attack.apply_patch(image_batch)
+        
+        # convert annotations_batch to tensor
+        for i in range(len(annotations_batch)):
+            annotations_batch[i]["boxes"] = torch.from_numpy(annotations_batch[i]["boxes"]).type(torch.float).to(frcnn._device)
+            annotations_batch[i]["labels"] = torch.from_numpy(annotations_batch[i]["labels"]).type(torch.int64).to(frcnn._device)
+            annotations_batch[i]["scores"] = torch.from_numpy(annotations_batch[i]["scores"]).type(torch.float).to(frcnn._device)
 
         loss = get_loss(frcnn, x_patch, annotations_batch)
         logging.info(f"Loss for iteration {i}: {loss}")
@@ -211,7 +217,7 @@ if __name__ == "__main__":
         visualize_patch_only(attack._patch, save_path=patch_viz_path)
     
     # 训练后绘制loss曲线
-    loss_history_path = os.path.join(config["path"], "loss_history.json")
+    loss_history_path = os.path.join(config["training_log_dir"], "loss_history.json")
     with open(loss_history_path, "r") as f:
         loss_history = json.load(f)
 
@@ -224,7 +230,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(os.path.join(config["path"], "loss_curve.png"))
+    plt.savefig(os.path.join(config["training_log_dir"], "loss_curve.png"))
     plt.show()
 
     # test procedure
@@ -276,7 +282,7 @@ if __name__ == "__main__":
             class_names=COCO_INSTANCE_CATEGORY_NAMES,
             clean_scores=list(y[i]["scores"]) if "scores" in y[i] else None,
             adv_scores=list(predictions_adv[i]["scores"]) if "scores" in predictions_adv[i] else None,
-            save_path=os.path.join(config["path"], f"attack_comparison_{i}.png")
+            save_path=os.path.join(config["training_comparison_dir"], f"attack_comparison_{i}.png")
         )
 
     attack.close()
