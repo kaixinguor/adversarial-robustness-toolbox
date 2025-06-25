@@ -253,10 +253,13 @@ if __name__ == "__main__":
             scores=list(y[i]["scores"]) if "scores" in y[i] else None
         )
 
-    for i, y_i in enumerate(y):
-        y[i]["boxes"] = torch.from_numpy(y_i["boxes"]).type(torch.float).to(frcnn._device)
-        y[i]["labels"] = torch.from_numpy(y_i["labels"]).type(torch.int64).to(frcnn._device)
-        y[i]["scores"] = torch.from_numpy(y_i["scores"]).to(frcnn._device)
+    if frcnn._device == "cpu":
+        logging.warning("FasterRCNN is running on CPU, which is not recommended for training.")
+
+        for i, y_i in enumerate(y):
+            y[i]["boxes"] = torch.from_numpy(y_i["boxes"]).type(torch.float).to(frcnn._device)
+            y[i]["labels"] = torch.from_numpy(y_i["labels"]).type(torch.int64).to(frcnn._device)
+            y[i]["scores"] = torch.from_numpy(y_i["scores"]).to(frcnn._device)
 
     x_patch = attack.apply_patch(x)  
     predictions_adv = frcnn.predict(x=x_patch)
