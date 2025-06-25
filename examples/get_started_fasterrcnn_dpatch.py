@@ -35,6 +35,7 @@ from art.tools.plot_utils import plot_image_with_boxes
 from art.tools.fasterrcnn_utils import extract_predictions, get_loss, append_loss_history
 from art.tools.preprocess_utils import load_training_images
 from art.tools.coco_tools import load_annotation_data, visualize_training_images
+from art.tools.patch_utils import save_trained_patch, visualize_patch_only
 
 
 logging.basicConfig(
@@ -42,24 +43,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     handlers=[logging.StreamHandler()]
 )
-
-def visualize_patch_only(adversarial_patch: np.ndarray, save_path: str = None):
-    if adversarial_patch.shape[0] == 3 and adversarial_patch.shape[-1] != 3:
-        patch_rgb = np.transpose(adversarial_patch, (1, 2, 0))
-    else:
-        patch_rgb = adversarial_patch
-    patch_rgb = np.clip(patch_rgb, 0, 255).astype(np.uint8)
-    plt.figure(figsize=(6, 6))
-    plt.imshow(patch_rgb)
-    plt.title('Generated Adversarial Patch', fontsize=14, weight='bold')
-    plt.axis('off')
-    plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()
-
 
 def visualize_attack_comparison(clean_img, clean_boxes, clean_cls, adv_img, adv_boxes, adv_cls, class_names=None, clean_scores=None, adv_scores=None, save_path=None):
     fig, axes = plt.subplots(1, 2, figsize=(18, 8))
@@ -146,6 +129,7 @@ if __name__ == "__main__":
             "training_images_save_dir": "results/dpatch_fasterrcnn/training_output/images",
             "training_comparison_dir": "results/dpatch_fasterrcnn/training_output/comparison",
             "training_log_dir": "results/dpatch_fasterrcnn/training_output/log",
+            "training_patch_dir": "results/dpatch_fasterrcnn/training_output/patch",
             
             "annotation_path": 'dataset/vehicle_coco2017/annotations/instances_vehicle_train2017.json',
             "image_directory": "dataset/vehicle_coco2017/images/train2017",
@@ -160,6 +144,7 @@ if __name__ == "__main__":
     os.makedirs(config["training_images_save_dir"], exist_ok=True)
     os.makedirs(config["training_comparison_dir"], exist_ok=True)
     os.makedirs(config["training_log_dir"], exist_ok=True)
+    os.makedirs(config["training_patch_dir"], exist_ok=True)
 
     # Load annotation data
     _, file_to_annotations = load_annotation_data(config["annotation_path"])
@@ -196,10 +181,10 @@ if __name__ == "__main__":
     
     # training procedure
     if config["resume"]:
-        patch = np.load(os.path.join(config["path"], "patch.npy"))
+        patch = np.load(os.path.join(config["training_patch_dir"], "patch.npy"))
         attack._patch = patch
 
-        with open(os.path.join(config["path"], "loss_history.json"), "r") as file:
+        with open(os.path.join(config["training_log_dir"], "loss_history.json"), "r") as file:
             loss_history = json.load(file)
     else:
         loss_history = {"loss_classifier": [], "loss_box_reg": [], "loss_objectness": [], "loss_rpn_box_reg": []}
@@ -210,15 +195,38 @@ if __name__ == "__main__":
         x_patch = attack.apply_patch(image_batch)
 
         loss = get_loss(frcnn, x_patch, annotations_batch)
-        print(loss)
+        logging.info(f"Loss for iteration {i}: {loss}")
         loss_history = append_loss_history(loss_history, loss)
 
-        with open(os.path.join(config["path"], "loss_history.json"), "w") as file:
+        with open(os.path.join(config["training_log_dir"], "loss_history.json"), "w") as file:
             file.write(json.dumps(loss_history))
 
-        np.save(os.path.join(config["path"], "patch"), attack._patch)
-
+        # Save trained patch to file
+        logging.info("Saving trained patch to file...")
+        patch_file_path = save_trained_patch(attack._patch, config["training_patch_dir"], "trained_patch")
+        
+        # Save patch visualization
+        print("Saving trained patch visualization...")
+        patch_viz_path = os.path.join(config["training_patch_dir"], f'trained_patch.png')
+        visualize_patch_only(attack._patch, save_path=patch_viz_path)
     
+    # 训练后绘制loss曲线
+    loss_history_path = os.path.join(config["path"], "loss_history.json")
+    with open(loss_history_path, "r") as f:
+        loss_history = json.load(f)
+
+    plt.figure(figsize=(10, 6))
+    for loss_name, loss_values in loss_history.items():
+        plt.plot(loss_values, label=loss_name)
+    plt.xlabel("Iteration")
+    plt.ylabel("Loss Value")
+    plt.title("DPatch Training Loss Curve")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(config["path"], "loss_curve.png"))
+    plt.show()
+
     # test procedure
     image_1 = cv2.imread(config["image_file"])
     image_1 = cv2.cvtColor(image_1, cv2.COLOR_BGR2RGB)  # Convert to RGB
@@ -243,7 +251,6 @@ if __name__ == "__main__":
         y[i]["boxes"] = torch.from_numpy(y_i["boxes"]).type(torch.float).to(frcnn._device)
         y[i]["labels"] = torch.from_numpy(y_i["labels"]).type(torch.int64).to(frcnn._device)
         y[i]["scores"] = torch.from_numpy(y_i["scores"]).to(frcnn._device)
-
 
     x_patch = attack.apply_patch(x)  
     predictions_adv = frcnn.predict(x=x_patch)
@@ -271,26 +278,5 @@ if __name__ == "__main__":
             adv_scores=list(predictions_adv[i]["scores"]) if "scores" in predictions_adv[i] else None,
             save_path=os.path.join(config["path"], f"attack_comparison_{i}.png")
         )
-
-    # 在攻击前保存patch可视化
-    patch_vis_path = os.path.join(config["path"], "patch_visualization.png")
-    visualize_patch_only(attack._patch, save_path=patch_vis_path)
-
-    # 训练后绘制loss曲线
-    loss_history_path = os.path.join(config["path"], "loss_history.json")
-    with open(loss_history_path, "r") as f:
-        loss_history = json.load(f)
-
-    plt.figure(figsize=(10, 6))
-    for loss_name, loss_values in loss_history.items():
-        plt.plot(loss_values, label=loss_name)
-    plt.xlabel("Iteration")
-    plt.ylabel("Loss Value")
-    plt.title("DPatch Training Loss Curve")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(config["path"], "loss_curve.png"))
-    plt.show()
 
     attack.close()
