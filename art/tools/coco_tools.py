@@ -3,11 +3,13 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import json
+import numpy as np
 from collections import defaultdict
 from typing import Dict, List, Tuple
 from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES as COCO80_NAMES
 
 SUPPORTED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
+
 def coco90_to_80():
     """
     将COCO官方90类ID（含跳号）映射到连续80类索引（0-based）。
@@ -35,6 +37,7 @@ def coco90_to_80():
 
     return mapper
 
+
 def coco_label_mapping(label):
     """
     调用coco90_to_80的接口
@@ -46,6 +49,36 @@ def coco_label_mapping(label):
 
     map_fn = coco90_to_80()
     return map_fn(label)
+
+
+def coco_resize_bboxes(bboxes, original_size, new_size):
+    """
+    按比例缩放bboxes标签坐标 coco数据类型
+
+    inputs:
+        bboxes: List of [x_min,y_min,weight,height] 原始bboxes 可以是 numpy 数组或列表
+        original_size: (width, height) 原始图像尺寸
+        new_size: (width, height) Resize后的图像尺寸
+
+    output:
+        bboxes: List of [x_min,y_min,x_max,y_max] 缩放后的 bboxes
+    """
+
+    bboxes = np.array(bboxes)
+    bboxes[:,2] = bboxes[:,0] + bboxes[:,2]
+    bboxes[:,3] = bboxes[:,1] + bboxes[:,3]
+    orig_w, orig_h = original_size
+    new_w, new_h = new_size
+
+    scale_x = new_w / orig_w
+    scale_y = new_h / orig_h
+
+    bboxes[:, [0, 2]] = bboxes[:, [0, 2]] * scale_x  # x_min, x_max
+    bboxes[:, [1, 3]] = bboxes[:, [1, 3]] * scale_y  # y_min, y_max
+
+    return bboxes
+
+
 def get_original_annotations(
     image_path: str,
     file_to_annotations: Dict[str, List[Dict]]

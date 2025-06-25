@@ -65,7 +65,7 @@ class DPatch(EvasionAttack):
     def __init__(
         self,
         estimator: "OBJECT_DETECTOR_TYPE",
-        patch_shape: tuple[int, int, int] = (40, 40, 3),
+        patch_shape: tuple[int, int, int] = (3, 40, 40),
         learning_rate: float = 5.0,
         max_iter: int = 10,
         batch_size: int = 16,
