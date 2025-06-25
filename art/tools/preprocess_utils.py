@@ -47,7 +47,7 @@ def load_training_images(
                 processed_images.append(image_array)
                 all_annotations.append(annotations)
                 image_count += 1
-                print(f"Loaded training image {image_count}: {filename} ({len(annotations)} objects)")
+                print(f"Loaded training image {image_count}: {filename} ({len(annotations['boxes'])} objects)")
     
     # Stack all images into a single array with shape [B,C,H,W]
     if processed_images:
