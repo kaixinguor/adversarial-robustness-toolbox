@@ -20,19 +20,21 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import torchvision
 import argparse
 import json
 import yaml
 import pprint
 import matplotlib.patches as patches
 import logging
+import os.path as osp
 
 from art.estimators.object_detection import PyTorchFasterRCNN
 from art.attacks.evasion import DPatch
 from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES
 from art.tools.plot_utils import plot_image_with_boxes
 from art.tools.fasterrcnn_utils import extract_predictions, get_loss, append_loss_history
+
+from art.tools.coco_tools import load_annotation_data, visualize_training_images
 
 logging.basicConfig(
     level=logging.INFO,
@@ -137,13 +139,35 @@ if __name__ == "__main__":
             "max_iter": 1,
             "image_file": "dataset/vehicle_images_5/images/000000000471.jpg",
             "resume": False,
-            "path": "results/dpatch_fasterrcnn",
+            
+            "training_output_dir": "results/dpatch_fasterrcnn/training_output",
+            "training_visualization_dir": "results/dpatch_fasterrcnn/training_output/visualization",
+            "training_images_save_dir": "results/dpatch_fasterrcnn/training_output/images",
+            "training_comparison_dir": "results/dpatch_fasterrcnn/training_output/comparison",
+            "training_log_dir": "results/dpatch_fasterrcnn/training_output/log",
+            
+            "annotation_path": 'dataset/vehicle_coco2017/annotations/instances_vehicle_train2017.json',
+            "image_directory": "dataset/vehicle_coco2017/images/train2017",
+            "config_file": "mmdetection/configs/faster_rcnn/faster-rcnn_r101_fpn_1x_coco-dpatch.py",
+            "checkpoint_file": "mmdetection/weights/faster_rcnn_r101_fpn_1x_coco.pth"
+            
+            
         }
 
-    os.makedirs(config["path"], exist_ok=True)
+    # Create output directories
+    os.makedirs(config["training_visualization_dir"], exist_ok=True)
+    os.makedirs(config["training_images_save_dir"], exist_ok=True)
+    os.makedirs(config["training_comparison_dir"], exist_ok=True)
+    os.makedirs(config["training_log_dir"], exist_ok=True)
 
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(config)
+    # Load annotation data
+    _, file_to_annotations = load_annotation_data(config["annotation_path"])
+    
+    # Visualize training images
+    visualize_training_images(config["image_directory"], file_to_annotations, config["training_images_save_dir"], max_images=5)
+    
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(config)
 
     if config["cuda_visible_devices"] is None:
         device_type = "cpu"
@@ -155,19 +179,18 @@ if __name__ == "__main__":
         clip_values=(0, 255), channels_first=False, attack_losses=config["attack_losses"], device_type=device_type
     )
 
+    attack = DPatch(
+        frcnn,
+        log_dir=config["training_log_dir"]
+    )
+
     image_1 = cv2.imread(config["image_file"])
     image_1 = cv2.cvtColor(image_1, cv2.COLOR_BGR2RGB)  # Convert to RGB
     image_1 = cv2.resize(image_1, dsize=(image_1.shape[1], image_1.shape[0]), interpolation=cv2.INTER_CUBIC)
 
     image = np.stack([image_1], axis=0).astype(np.float32)
-
-    attack = DPatch(
-        frcnn,
-        log_dir="results/dpatch_fasterrcnn/log"
-    )
-
+    
     x = image.copy()
-
     y = frcnn.predict(x=x)
 
     for i in range(image.shape[0]):
