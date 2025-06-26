@@ -8,6 +8,7 @@ from art.tools.coco_tools import get_original_annotations
 from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES as COCO80_NAMES
 from art.tools.preprocess_utils import SUPPORTED_EXTENSIONS
 from typing import Dict, List
+import time
 
 def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
     """
@@ -60,41 +61,50 @@ def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
     plt.show()
 
 def visualize_attack_comparison(
-    img_width: str,
-    img_height: str,
-    processed_image: str,
-    patched_image: str,
+    processed_image: np.ndarray,
     processed_annotations: np.ndarray,
+    patched_image: np.ndarray,
     original_detections: np.ndarray,
     patched_detections: np.ndarray,
     class_names: List[str] = None,
-    save_path: str = None
+    save_dir: str = None
 ) -> None:
     """
     Visualize attack comparison: original vs patched image with annotations and detection results.
     
     Args:
-        original_image_path: Path to the original image
-        adversarial_patch: Generated adversarial patch
-        file_to_annotations: Mapping from filename to annotations
+        processed_image: Processed image array in BGR format [H,W,C]
+        processed_annotations: Ground truth annotations
+        patched_image: Patched image array in BGR format [H,W,C]
+        original_detections: Detection results on original image
+        patched_detections: Detection results on patched image
         class_names: List of class names
-        save_path: Save path for the comparison image
-        config_file: Path to model config for detection
-        checkpoint_file: Path to model checkpoint for detection
+        save_dir: Directory to save the comparison image
     """
+    # Convert BGR to RGB for visualization
+    processed_image_rgb = processed_image[..., ::-1].copy()  # BGR to RGB
+    patched_image_rgb = patched_image[..., ::-1].copy()  # BGR to RGB
+    
+    # Ensure image values are in valid range for matplotlib
+    processed_image_rgb = np.clip(processed_image_rgb, 0, 255).astype(np.uint8)
+    patched_image_rgb = np.clip(patched_image_rgb, 0, 255).astype(np.uint8)
 
+    img_height, img_width = processed_image_rgb.shape[:2]
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     
     # Define colors
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
     
     # Plot 1: Original image with ground truth annotations
-    axes[0, 0].imshow(processed_image)
+    axes[0, 0].imshow(processed_image_rgb)
     axes[0, 0].set_title('Original Image (Ground Truth)', fontsize=14, weight='bold')
     axes[0, 0].axis('off')
     
     # Draw ground truth annotations
-    for i, (bbox, label) in enumerate(processed_annotations):
+    boxes = processed_annotations["boxes"]
+    labels = processed_annotations["labels"]
+    scores = processed_annotations["scores"]
+    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
         x_min, y_min, x_max, y_max = bbox
         
         # Check bounds
@@ -107,11 +117,9 @@ def visualize_attack_comparison(
         if class_names and 0 <= label < len(class_names):
             class_name = class_names[label]
         else:
-        # 在攻击后图像上添加矩形
             class_name = f"class_{label}"
         
         color = colors[label % len(colors)]
-        # 如果adv_scores不为空，则分数
         
         # Draw bounding box
         rect = patches.Rectangle(
@@ -121,21 +129,20 @@ def visualize_attack_comparison(
         axes[0, 0].add_patch(rect)
         
         # Add label
-    # 调整布局
         axes[0, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
                         bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
                         fontsize=10, color='white', weight='bold')
     
     # Plot 2: Original image with detection results
-    axes[0, 1].imshow(processed_image)
+    axes[0, 1].imshow(processed_image_rgb)
     axes[0, 1].set_title('Original Image (Detection Results)', fontsize=14, weight='bold')
     axes[0, 1].axis('off')
     
     # Draw detection results on original image
-    for i, detection in enumerate(original_detections):
-        bbox = detection['bbox']
-        label = detection['label']
-        score = detection['score']
+    boxes = original_detections["boxes"]
+    labels = original_detections["labels"]
+    scores = original_detections["scores"]
+    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
         
         x_min, y_min, x_max, y_max = bbox
         
@@ -160,12 +167,15 @@ def visualize_attack_comparison(
                         fontsize=10, color='white', weight='bold')
     
     # Plot 3: Patched image with ground truth annotations
-    axes[1, 0].imshow(patched_image)
+    axes[1, 0].imshow(patched_image_rgb)
     axes[1, 0].set_title('Patched Image (Ground Truth)', fontsize=14, weight='bold')
     axes[1, 0].axis('off')
     
     # Draw ground truth annotations on patched image
-    for i, (bbox, label) in enumerate(processed_annotations):
+    boxes = processed_annotations["boxes"]
+    labels = processed_annotations["labels"]
+    scores = processed_annotations["scores"]
+    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
         x_min, y_min, x_max, y_max = bbox
         
         # Check bounds
@@ -195,15 +205,15 @@ def visualize_attack_comparison(
                         fontsize=10, color='white', weight='bold')
     
     # Plot 4: Patched image with detection results
-    axes[1, 1].imshow(patched_image)
+    axes[1, 1].imshow(patched_image_rgb)
     axes[1, 1].set_title('Patched Image (Detection Results)', fontsize=14, weight='bold')
     axes[1, 1].axis('off')
     
     # Draw detection results on patched image
-    for i, detection in enumerate(patched_detections):
-        bbox = detection['bbox']
-        label = detection['label']
-        score = detection['score']
+    boxes = patched_detections["boxes"]
+    labels = patched_detections["labels"]
+    scores = patched_detections["scores"]
+    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
         
         x_min, y_min, x_max, y_max = bbox
         
@@ -229,25 +239,25 @@ def visualize_attack_comparison(
     
     # Print attack summary
     print(f"\n=== Attack Summary ===")
-    print(f"Number of ground truth targets: {len(processed_annotations)}")
-    print(f"Original image detections: {len(original_detections)}")
-    print(f"Patched image detections: {len(patched_detections)}")
+    print(f"Number of ground truth targets: {len(processed_annotations['boxes'])}")
+    print(f"Original image detections: {len(original_detections['boxes'])}")
+    print(f"Patched image detections: {len(patched_detections['boxes'])}")
     
     # Calculate attack effectiveness
-    if len(original_detections) > 0:
-        detection_change = len(patched_detections) - len(original_detections)
-        detection_reduction = (len(original_detections) - len(patched_detections)) / len(original_detections) * 100
+    if len(original_detections['boxes']) > 0:
+        detection_change = len(patched_detections['boxes']) - len(original_detections['boxes'])
+        detection_reduction = (len(original_detections['boxes']) - len(patched_detections['boxes'])) / len(original_detections['boxes']) * 100
         print(f"Detection count change: {detection_change:+d}")
         print(f"Detection reduction: {detection_reduction:.1f}%")
 
     plt.tight_layout()
     
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"Attack comparison saved to: {save_path}")
-    else:
-        plt.show()
-    
+    # Use timestamp for unique filename
+    timestamp = int(time.time())
+    save_path = os.path.join(save_dir, f"attack_comparison_{timestamp}.png")
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    print(f"Attack comparison saved to: {save_path}")
+  
     plt.close()
 
 def visualize_original_annotations(
