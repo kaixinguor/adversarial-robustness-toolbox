@@ -14,7 +14,7 @@ from art.attacks.evasion import DPatch
 from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES as COCO90_NAMES
 from art.tools.preprocess_utils import process_image_file, create_batch_loader
 from art.tools.plot_utils import visualize_attack_comparison, visualize_training_images
-from art.tools.fasterrcnn_utils import extract_predictions, get_loss, append_loss_history
+from art.tools.fasterrcnn_utils import get_loss, append_loss_history
 from art.tools.coco_tools import load_annotation_data
 from art.tools.patch_utils import save_trained_patch, visualize_patch_only
 
@@ -194,7 +194,7 @@ def attack_test(config):
 
     # predict on adversarial image
     logging.info(f"\nPredict on adversarial image {image_path}")
-    x_patch = attack.apply_patch(x)  
+    x_patch = attack.apply_patch(x, random_location=True)  
     predictions_adv = frcnn.predict(x=x_patch)
 
     # Save comparison visualization

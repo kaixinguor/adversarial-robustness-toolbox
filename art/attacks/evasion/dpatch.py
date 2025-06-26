@@ -275,13 +275,21 @@ class DPatch(EvasionAttack):
                     a_max=self.estimator.clip_values[1],
                 )
 
+            # patched_images, _ = self._augment_images_with_patch(
+            #     x,
+            #     self._patch,
+            #     random_location=True,
+            #     channels_first=self.estimator.channels_first,
+            #     mask=None,
+            #     transforms=transforms,
+            # )
             patched_images, _ = self._augment_images_with_patch(
                 x,
                 self._patch,
-                random_location=False,
+                random_location=True,
                 channels_first=self.estimator.channels_first,
-                mask=None,
-                transforms=transforms,
+                mask=mask,
+                transforms=None,
             )
 
         return self._patch
