@@ -28,7 +28,7 @@ def get_loss(frcnn, x, y):
     frcnn._model.train()
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
     image_tensor_list = list()
-
+    
     for i in range(x.shape[0]):
         if frcnn.clip_values is not None:
             img = transform(x[i] / frcnn.clip_values[1]).to(frcnn._device)
@@ -37,9 +37,11 @@ def get_loss(frcnn, x, y):
         image_tensor_list.append(img)
 
     loss = frcnn._model(image_tensor_list, y)
+    loss_sum = 0
     for loss_type in ["loss_classifier", "loss_box_reg", "loss_objectness", "loss_rpn_box_reg"]:
         loss[loss_type] = loss[loss_type].cpu().detach().numpy().item()
-    return loss
+        loss_sum += loss[loss_type]
+    return loss, loss_sum
 
 def append_loss_history(loss_history, output):
     for loss in ["loss_classifier", "loss_box_reg", "loss_objectness", "loss_rpn_box_reg"]:

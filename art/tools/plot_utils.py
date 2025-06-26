@@ -1,6 +1,13 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
+from typing import List
+import os
+import cv2
+from art.tools.coco_tools import get_original_annotations
+from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES as COCO90_NAMES
+from art.tools.preprocess_utils import SUPPORTED_EXTENSIONS
+from typing import Dict, List
 
 def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
     """
@@ -51,3 +58,326 @@ def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
     
     plt.tight_layout()
     plt.show()
+
+def visualize_attack_comparison(
+    img_width: str,
+    img_height: str,
+    processed_image: str,
+    patched_image: str,
+    processed_annotations: np.ndarray,
+    original_detections: np.ndarray,
+    patched_detections: np.ndarray,
+    class_names: List[str] = None,
+    save_path: str = None
+) -> None:
+    """
+    Visualize attack comparison: original vs patched image with annotations and detection results.
+    
+    Args:
+        original_image_path: Path to the original image
+        adversarial_patch: Generated adversarial patch
+        file_to_annotations: Mapping from filename to annotations
+        class_names: List of class names
+        save_path: Save path for the comparison image
+        config_file: Path to model config for detection
+        checkpoint_file: Path to model checkpoint for detection
+    """
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # Define colors
+    colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
+    
+    # Plot 1: Original image with ground truth annotations
+    axes[0, 0].imshow(processed_image)
+    axes[0, 0].set_title('Original Image (Ground Truth)', fontsize=14, weight='bold')
+    axes[0, 0].axis('off')
+    
+    # Draw ground truth annotations
+    for i, (bbox, label) in enumerate(processed_annotations):
+        x_min, y_min, x_max, y_max = bbox
+        
+        # Check bounds
+        x_min = max(0, min(x_min, img_width))
+        y_min = max(0, min(y_min, img_height))
+        x_max = max(0, min(x_max, img_width))
+        y_max = max(0, min(y_max, img_height))
+        
+        # Get class name
+        if class_names and 0 <= label < len(class_names):
+            class_name = class_names[label]
+        else:
+        # 在攻击后图像上添加矩形
+            class_name = f"class_{label}"
+        
+        color = colors[label % len(colors)]
+        # 如果adv_scores不为空，则分数
+        
+        # Draw bounding box
+        rect = patches.Rectangle(
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=2, edgecolor=color, facecolor='none'
+        )
+        axes[0, 0].add_patch(rect)
+        
+        # Add label
+    # 调整布局
+        axes[0, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                        fontsize=10, color='white', weight='bold')
+    
+    # Plot 2: Original image with detection results
+    axes[0, 1].imshow(processed_image)
+    axes[0, 1].set_title('Original Image (Detection Results)', fontsize=14, weight='bold')
+    axes[0, 1].axis('off')
+    
+    # Draw detection results on original image
+    for i, detection in enumerate(original_detections):
+        bbox = detection['bbox']
+        label = detection['label']
+        score = detection['score']
+        
+        x_min, y_min, x_max, y_max = bbox
+        
+        # Get class name
+        if class_names and 0 <= label < len(class_names):
+            class_name = class_names[label]
+        else:
+            class_name = f"class_{label}"
+        
+        color = colors[label % len(colors)]
+        
+        # Draw bounding box
+        rect = patches.Rectangle(
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=2, edgecolor=color, facecolor='none'
+        )
+        axes[0, 1].add_patch(rect)
+        
+        # Add label with score
+        axes[0, 1].text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                        fontsize=10, color='white', weight='bold')
+    
+    # Plot 3: Patched image with ground truth annotations
+    axes[1, 0].imshow(patched_image)
+    axes[1, 0].set_title('Patched Image (Ground Truth)', fontsize=14, weight='bold')
+    axes[1, 0].axis('off')
+    
+    # Draw ground truth annotations on patched image
+    for i, (bbox, label) in enumerate(processed_annotations):
+        x_min, y_min, x_max, y_max = bbox
+        
+        # Check bounds
+        x_min = max(0, min(x_min, img_width))
+        y_min = max(0, min(y_min, img_height))
+        x_max = max(0, min(x_max, img_width))
+        y_max = max(0, min(y_max, img_height))
+        
+        # Get class name
+        if class_names and 0 <= label < len(class_names):
+            class_name = class_names[label]
+        else:
+            class_name = f"class_{label}"
+        
+        color = colors[label % len(colors)]
+        
+        # Draw bounding box
+        rect = patches.Rectangle(
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=2, edgecolor=color, facecolor='none'
+        )
+        axes[1, 0].add_patch(rect)
+        
+        # Add label
+        axes[1, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                        fontsize=10, color='white', weight='bold')
+    
+    # Plot 4: Patched image with detection results
+    axes[1, 1].imshow(patched_image)
+    axes[1, 1].set_title('Patched Image (Detection Results)', fontsize=14, weight='bold')
+    axes[1, 1].axis('off')
+    
+    # Draw detection results on patched image
+    for i, detection in enumerate(patched_detections):
+        bbox = detection['bbox']
+        label = detection['label']
+        score = detection['score']
+        
+        x_min, y_min, x_max, y_max = bbox
+        
+        # Get class name
+        if class_names and 0 <= label < len(class_names):
+            class_name = class_names[label]
+        else:
+            class_name = f"class_{label}"
+        
+        color = colors[label % len(colors)]
+        
+        # Draw bounding box
+        rect = patches.Rectangle(
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=2, edgecolor=color, facecolor='none'
+        )
+        axes[1, 1].add_patch(rect)
+        
+        # Add label with score
+        axes[1, 1].text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                        fontsize=10, color='white', weight='bold')
+    
+    # Print attack summary
+    print(f"\n=== Attack Summary ===")
+    print(f"Number of ground truth targets: {len(processed_annotations)}")
+    print(f"Original image detections: {len(original_detections)}")
+    print(f"Patched image detections: {len(patched_detections)}")
+    
+    # Calculate attack effectiveness
+    if len(original_detections) > 0:
+        detection_change = len(patched_detections) - len(original_detections)
+        detection_reduction = (len(original_detections) - len(patched_detections)) / len(original_detections) * 100
+        print(f"Detection count change: {detection_change:+d}")
+        print(f"Detection reduction: {detection_reduction:.1f}%")
+
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Attack comparison saved to: {save_path}")
+    else:
+        plt.show()
+    
+    plt.close()
+
+def visualize_original_annotations(
+    image_path: str, 
+    file_to_annotations: Dict[str, List[Dict]],
+    class_names: List[str] = None, 
+    save_path: str = None
+) -> None:
+    """
+    Visualize original image annotations with bounding boxes and labels.
+    This function works with original image coordinates, not scaled ones.
+    
+    Args:
+        image_path: Path to the image file
+        file_to_annotations: Mapping from filename to annotations
+        class_names: List of class names
+        save_path: Save path, if None then display the image
+    """
+    # Get original annotations
+    annotations = get_original_annotations(image_path, file_to_annotations)
+    
+    # Read original image
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Get image dimensions
+    img_height, img_width = image.shape[:2]
+    print(f"Original image size: {img_width} x {img_height}")
+    
+    # Create matplotlib figure
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax.imshow(image)
+    
+    # Define color list
+    colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
+    
+    print(f"\n=== Original Annotation Info: {os.path.basename(image_path)} ===")
+    print(f"Number of detected objects: {len(annotations)}")
+    
+    for i, (bbox, label) in enumerate(annotations):
+        x_min, y_min, x_max, y_max = bbox
+        
+        # Check if bbox coordinates are within image bounds
+        x_min = max(0, min(x_min, img_width))
+        y_min = max(0, min(y_min, img_height))
+        x_max = max(0, min(x_max, img_width))
+        y_max = max(0, min(y_max, img_height))
+        
+        # Get class name
+        if class_names and 0 <= label < len(class_names):
+            class_name = class_names[label]
+        else:
+            class_name = f"class_{label}"
+        
+        # Select color
+        color = colors[label % len(colors)]
+        
+        # Draw bounding box
+        rect = patches.Rectangle(
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=2, edgecolor=color, facecolor='none'
+        )
+        ax.add_patch(rect)
+        
+        # Add label text
+        ax.text(x_min, y_min - 5, class_name, 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                fontsize=10, color='white', weight='bold')
+        
+        # Print annotation info
+        print(f"Object {i+1}: {class_name} (ID: {label}) - BBox: [{x_min:.1f}, {y_min:.1f}, {x_max:.1f}, {y_max:.1f}]")
+        print(f"  BBox size: {x_max - x_min:.1f} x {y_max - y_min:.1f}")
+    
+    ax.set_title(f'Original Image Annotations: {os.path.basename(image_path)}', fontsize=14, weight='bold')
+    ax.axis('off')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Original annotation visualization saved to: {save_path}")
+    else:
+        plt.show()
+    
+    plt.close()
+
+
+def visualize_training_images(
+    images_directory: str,
+    file_to_annotations: Dict[str, List[Dict]],
+    save_directory: str,
+    max_images: int = 5
+) -> None:
+    """
+    Visualize training images with their annotations.
+    
+    Args:
+        images_directory: Directory containing image files
+        file_to_annotations: Mapping from filename to annotations
+        max_images: Maximum number of images to visualize
+    """
+    print(f"\nVisualizing training images (up to {max_images})...")
+    
+    # Create training images directory
+    os.makedirs(save_directory, exist_ok=True)
+    
+    image_count = 0
+    filename_list = sorted(os.listdir(images_directory))
+    for filename in filename_list:
+        if image_count >= max_images:
+            break
+            
+        if not filename.lower().endswith(SUPPORTED_EXTENSIONS):
+            continue
+        
+        image_path = os.path.join(images_directory, filename)
+        
+        # Get annotations for this image
+        annotations = get_original_annotations(image_path, file_to_annotations)
+        
+        if not annotations: # Only visualize images with annotations
+            print(f"Warning: image {filename} does not have annotations. Skip for visualizeation!")
+            continue
+ 
+        print(f"Visualizing training image {image_count+1}: {filename}")
+        save_path = os.path.join(save_directory, f'training_image_{image_count+1}.png')
+        visualize_original_annotations(
+            image_path=image_path,
+            file_to_annotations=file_to_annotations,
+            class_names=COCO90_NAMES,
+            save_path=save_path
+        )
+        image_count += 1
