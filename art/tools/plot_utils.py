@@ -5,7 +5,7 @@ from typing import List
 import os
 import cv2
 from art.tools.coco_tools import get_original_annotations
-from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES as COCO90_NAMES
+from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES as COCO80_NAMES
 from art.tools.preprocess_utils import SUPPORTED_EXTENSIONS
 from typing import Dict, List
 
@@ -377,7 +377,7 @@ def visualize_training_images(
         visualize_original_annotations(
             image_path=image_path,
             file_to_annotations=file_to_annotations,
-            class_names=COCO90_NAMES,
+            class_names=COCO80_NAMES,
             save_path=save_path
         )
         image_count += 1

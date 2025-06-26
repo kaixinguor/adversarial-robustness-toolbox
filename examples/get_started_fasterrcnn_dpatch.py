@@ -250,7 +250,7 @@ if __name__ == "__main__":
             "save_interval": 10,  # Save loss history every N batches
 
             # training input parameters
-            "annotation_path": 'dataset/vehicle_coco2017/annotations/instances_vehicle_train2017.json',
+            "annotation_path": 'dataset/coco2017/annotations/instances_train2017.json',
             "image_directory": "dataset/vehicle_coco2017/images/train2017",
             "config_file": "mmdetection/configs/faster_rcnn/faster-rcnn_r101_fpn_1x_coco-dpatch.py",
             "checkpoint_file": "mmdetection/weights/faster_rcnn_r101_fpn_1x_coco.pth",
