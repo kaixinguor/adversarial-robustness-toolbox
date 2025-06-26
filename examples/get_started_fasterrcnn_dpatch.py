@@ -11,7 +11,7 @@ from torchvision import transforms
 from art.estimators.object_detection import PyTorchFasterRCNN
 from art.attacks.evasion import DPatch
 
-from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES as COCO80_NAMES
+from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES as COCO90_NAMES
 from art.tools.preprocess_utils import process_image_file, create_batch_loader
 from art.tools.plot_utils import visualize_attack_comparison, visualize_training_images
 from art.tools.fasterrcnn_utils import extract_predictions, get_loss, append_loss_history
@@ -205,7 +205,7 @@ def attack_test(config):
         patched_image=x_patch[0],  # [H,W,C] BGR format
         original_detections=predictions[0],
         patched_detections=predictions_adv[0],
-        class_names=COCO80_NAMES,
+        class_names=COCO90_NAMES,
         save_dir=config["test_output_dir"]
     )
 
@@ -214,7 +214,7 @@ def attack_test(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Professional DPatch training for FasterRCNN")
     parser.add_argument("--config", required=False, default=None, help="Path of config yaml file")
-    parser.add_argument("--mode", choices=["train", "test"], default="test", help="Training or testing mode")
+    parser.add_argument("--mode", choices=["train", "test"], default="train", help="Training or testing mode")
     cmdline = parser.parse_args()
 
     if cmdline.config and os.path.exists(cmdline.config):

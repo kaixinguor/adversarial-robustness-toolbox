@@ -256,7 +256,7 @@ def process_image_file(
     bboxes = coco_resize_bboxes(bboxes, original_shape, resized_shape)
     
     labels = [annotation['category_id'] for annotation in annotations]
-    labels = [coco_label_mapping(label) for label in labels]
+    # labels = [coco_label_mapping(label) for label in labels]
 
     # processed_annotations = list(zip(bboxes, labels))
     processed_annotations = {'boxes': np.array(bboxes), 
