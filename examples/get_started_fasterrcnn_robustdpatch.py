@@ -9,7 +9,7 @@ import yaml
 from torchvision import transforms
 
 from art.estimators.object_detection import PyTorchFasterRCNN
-from art.attacks.evasion import DPatch
+from art.attacks.evasion import RobustDPatch
 
 from art.tools.coco_categories90 import COCO_INSTANCE_CATEGORY_NAMES as COCO90_NAMES
 from art.tools.preprocess_utils import process_image_file, create_batch_loader
@@ -47,7 +47,7 @@ def attack_train(config):
         clip_values=(0, 255), channels_first=False, attack_losses=config["attack_losses"], device_type=device_type
     )
 
-    attack = DPatch(
+    attack = RobustDPatch(
         frcnn,
         log_dir=config["training_log_dir"]
     )
@@ -108,22 +108,22 @@ def attack_train(config):
             if (batch_idx + 1) % config.get("save_interval", 10) == 0:
                 with open(os.path.join(config["training_log_dir"], "loss_history.json"), "w") as file:
                     file.write(json.dumps(loss_history))
+
+        # End of epoch processing
+        avg_epoch_loss = np.mean(epoch_losses)
+        logging.info(f"Epoch {epoch + 1} average loss: {avg_epoch_loss}")
         
         # Save trained patch after each epoch
         logging.info("Saving trained patch to file...")
         patch_file_path = save_trained_patch(attack._patch, config["training_patch_dir"], f"trained_patch_epoch_{epoch + 1}")
         patch_file_path = save_trained_patch(attack._patch, config["training_patch_dir"], f"patch")
-            
-        # End of epoch processing
-        avg_epoch_loss = np.mean(epoch_losses)
-        logging.info(f"Epoch {epoch + 1} average loss: {avg_epoch_loss}")
-        
+
         # Save patch visualization
         print("Saving trained patch visualization...")
-
         patch_viz_path = os.path.join(config["training_patch_dir"], f'trained_patch_epoch_{epoch + 1}.png')
         visualize_patch_only(attack._patch, save_path=patch_viz_path)
     
+        
     # 训练后绘制loss曲线
     loss_history_path = os.path.join(config["training_log_dir"], "loss_history.json")
     with open(loss_history_path, "r") as f:
@@ -134,7 +134,7 @@ def attack_train(config):
         plt.plot(loss_values, label=loss_name, alpha=0.8)
     plt.xlabel("Training Step")
     plt.ylabel("Loss Value")
-    plt.title("DPatch Training Loss Curve")
+    plt.title("RobustDPatch Training Loss Curve")
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -160,7 +160,7 @@ def attack_test(config):
         clip_values=(0, 255), channels_first=False, attack_losses=config["attack_losses"], device_type=device_type
     )
 
-    attack = DPatch(
+    attack = RobustDPatch(
         frcnn
     )
         
@@ -211,7 +211,7 @@ def attack_test(config):
     attack.close()
     
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Professional DPatch training for FasterRCNN")
+    parser = argparse.ArgumentParser(description="RobustDPatch training for FasterRCNN")
     parser.add_argument("--config", required=False, default=None, help="Path of config yaml file")
     parser.add_argument("--mode", choices=["train", "test"], default="train", help="Training or testing mode")
     cmdline = parser.parse_args()
@@ -241,23 +241,23 @@ if __name__ == "__main__":
             "checkpoint_file": "mmdetection/weights/faster_rcnn_r101_fpn_1x_coco.pth",
             
             # training output parameters
-            "training_output_dir": "results/dpatch_fasterrcnn/training_output",
-            "training_visualization_dir": "results/dpatch_fasterrcnn/training_output/visualization",
-            "training_images_save_dir": "results/dpatch_fasterrcnn/training_output/images",
-            "training_comparison_dir": "results/dpatch_fasterrcnn/training_output/comparison",
-            "training_log_dir": "results/dpatch_fasterrcnn/training_output/log",
-            "training_patch_dir": "results/dpatch_fasterrcnn/training_output/patch",
+            "training_output_dir": "results/robustdpatch_fasterrcnn/training_output",
+            "training_visualization_dir": "results/robustdpatch_fasterrcnn/training_output/visualization",
+            "training_images_save_dir": "results/robustdpatch_fasterrcnn/training_output/images",
+            "training_comparison_dir": "results/robustdpatch_fasterrcnn/training_output/comparison",
+            "training_log_dir": "results/robustdpatch_fasterrcnn/training_output/log",
+            "training_patch_dir": "results/robustdpatch_fasterrcnn/training_output/patch",
             
             # test parameters
             "image_file": "dataset/vehicle_images_5/images/000000000471.jpg",
             "resume": False,
             "image_size": (500, 500),
-            "test_output_dir": "results/dpatch_fasterrcnn/test_output",
+            "test_output_dir": "results/robustdpatch_fasterrcnn/test_output",
     }
 
     if cmdline.mode == "train":
-        print("Starting DPatch training...")
+        print("Starting RobustDPatch training...")
         attack_train(config)
     elif cmdline.mode == "test":
-        print("Starting DPatch testing...")
+        print("Starting RobustDPatch testing...")
         attack_test(config)

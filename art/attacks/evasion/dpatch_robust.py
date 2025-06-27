@@ -39,6 +39,7 @@ from art.estimators.estimator import BaseEstimator, LossGradientsMixin
 from art.estimators.object_detection.object_detector import ObjectDetectorMixin
 from art import config
 from art.summary_writer import SummaryWriter
+import os
 
 if TYPE_CHECKING:
     from art.utils import OBJECT_DETECTOR_TYPE
@@ -84,11 +85,12 @@ class RobustDPatch(EvasionAttack):
         rotation_weights: tuple[float, float, float, float] | tuple[int, int, int, int] = (1, 0, 0, 0),
         sample_size: int = 1,
         learning_rate: float = 5.0,
-        max_iter: int = 500,
+        max_iter: int = 1,
         batch_size: int = 16,
         targeted: bool = False,
         summary_writer: str | bool | SummaryWriter = False,
         verbose: bool = True,
+        log_dir: str = None,
     ):
         """
         Create an instance of the :class:`.RobustDPatch`.
@@ -138,6 +140,11 @@ class RobustDPatch(EvasionAttack):
         self.sample_size = sample_size
         self._targeted = targeted
         self._check_params()
+        # 设置TensorBoard日志写入器
+        # self.writer = None
+        # if log_dir is not None:
+        #     os.makedirs(log_dir, exist_ok=True)
+            # self.writer = SummaryWriter(log_dir=log_dir)
 
     def generate(  # type: ignore
         self, x: np.ndarray, y: list[dict[str, np.ndarray]] | None = None, **kwargs
