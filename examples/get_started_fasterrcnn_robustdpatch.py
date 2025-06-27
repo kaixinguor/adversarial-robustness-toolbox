@@ -141,7 +141,7 @@ def attack_train(config):
     plt.savefig(os.path.join(config["training_log_dir"], "loss_curve.png"), dpi=150, bbox_inches='tight')
     # plt.show()
     
-    attack.close()
+    # attack.close()
 
 def attack_test(config):
     
@@ -193,7 +193,7 @@ def attack_test(config):
 
     # predict on adversarial image
     logging.info(f"\nPredict on adversarial image {image_path}")
-    x_patch = attack.apply_patch(x, random_location=True)  
+    x_patch = attack.apply_patch(x)  
     predictions_adv = frcnn.predict(x=x_patch)
 
     # Save comparison visualization
@@ -208,7 +208,7 @@ def attack_test(config):
         save_dir=config["test_output_dir"]
     )
 
-    attack.close()
+    # attack.close()
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RobustDPatch training for FasterRCNN")
