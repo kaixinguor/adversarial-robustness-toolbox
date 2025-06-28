@@ -69,7 +69,7 @@ class DPatch(EvasionAttack):
         estimator: "OBJECT_DETECTOR_TYPE",
         patch_shape: tuple[int, int, int] = (3, 40, 40),
         learning_rate: float = 5.0,
-        max_iter: int = 10,
+        max_iter: int = 100,
         batch_size: int = 1,
         verbose: bool = True,
         output_dir: str = "output",
@@ -314,10 +314,10 @@ class DPatch(EvasionAttack):
             # simple log
             avg_loss = loss_sum / self.batch_size
             logger.info(f"Iteration {i_step + 1}, Average loss: {avg_loss:.4f}")
-            if (i_step+1)%10==0:
-                temp_patch_out = os.path.join(self.output_dir, "patch")
-                os.makedirs(temp_patch_out, exist_ok=True)
-                save_patch(self._patch, temp_patch_out, f'iteration_{i_step + 1}',channels_first=self.estimator.channels_first)
+            # if (i_step+1)%10==0:
+            #     temp_patch_out = os.path.join(self.output_dir, "patch")
+                # os.makedirs(temp_patch_out, exist_ok=True)
+                # save_patch(self._patch, temp_patch_out, f'iteration_{i_step + 1}',channels_first=self.estimator.channels_first)
 
         return self._patch
 
@@ -409,9 +409,9 @@ class DPatch(EvasionAttack):
                 i_y_2 = transforms[i_image]["i_y_2"]
 
             # Debug information for the specific slice
-            print(f"Debug - Slice indices: i_x_1={i_x_1}, i_x_2={i_x_2}, i_y_1={i_y_1}, i_y_2={i_y_2}")
-            print(f"Debug - Slice shape: {x_copy[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :].shape}")
-            print(f"Debug - Patch shape: {patch_copy.shape}")
+            # print(f"Debug - Slice indices: i_x_1={i_x_1}, i_x_2={i_x_2}, i_y_1={i_y_1}, i_y_2={i_y_2}")
+            # print(f"Debug - Slice shape: {x_copy[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :].shape}")
+            # print(f"Debug - Patch shape: {patch_copy.shape}")
 
             x_copy[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :] = patch_copy
 

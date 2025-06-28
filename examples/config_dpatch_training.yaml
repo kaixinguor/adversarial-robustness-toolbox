@@ -15,7 +15,7 @@ cuda_visible_devices: "0"  # Use GPU 0, set to null for CPU
 max_epochs: 10              # 10 Number of training epochs
 batch_size: 16              # 16 Batch size - adjust based on GPU memory
 shuffle: true               # true Shuffle dataset for better training
-max_training_images: 64  # null for all images, or specify number like 1000
+max_training_images: 5  # null for all images, or specify number like 1000
 random_seed: 42             # For reproducible results
 save_interval: 5            # Save loss history every N batches
 resume: false               # Resume from previous training
