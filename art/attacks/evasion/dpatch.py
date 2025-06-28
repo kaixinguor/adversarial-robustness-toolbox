@@ -69,7 +69,7 @@ class DPatch(EvasionAttack):
         estimator: "OBJECT_DETECTOR_TYPE",
         patch_shape: tuple[int, int, int] = (3, 40, 40),
         learning_rate: float = 5.0,
-        max_iter: int = 100,
+        max_iter: int = 10,
         batch_size: int = 1,
         verbose: bool = True,
         output_dir: str = "output",
@@ -191,7 +191,7 @@ class DPatch(EvasionAttack):
         patched_images, transforms = self._augment_images_with_patch(
             x,
             self._patch,
-            random_location=False,
+            random_location=True,
             channels_first=self.estimator.channels_first,
             mask=mask,
             transforms=None,
@@ -257,7 +257,6 @@ class DPatch(EvasionAttack):
                 i_batch_start = i_batch * self.batch_size
                 i_batch_end = min((i_batch + 1) * self.batch_size, patched_images.shape[0])
 
-                self.estimator.model.train()
                 loss, gradients = self.estimator.loss_gradient(
                     x=patched_images[i_batch_start:i_batch_end],
                     y=patch_target[i_batch_start:i_batch_end],
@@ -303,7 +302,7 @@ class DPatch(EvasionAttack):
             #     mask=None,
             #     transforms=transforms,
             # )
-            patched_images, _ = self._augment_images_with_patch(
+            patched_images, transforms = self._augment_images_with_patch(
                 x,
                 self._patch,
                 random_location=True,
@@ -360,8 +359,8 @@ class DPatch(EvasionAttack):
             patch_copy = np.transpose(patch_copy, (1, 2, 0))
 
         # Debug information
-        print(f"Debug - x_copy shape: {x_copy.shape}, patch_copy shape: {patch_copy.shape}")
-        print(f"Debug - channels_first: {channels_first}")
+        # print(f"Debug - x_copy shape: {x_copy.shape}, patch_copy shape: {patch_copy.shape}")
+        # print(f"Debug - channels_first: {channels_first}")
 
         for i_image in range(x.shape[0]):
 

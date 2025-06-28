@@ -13,7 +13,7 @@ cuda_visible_devices: "0"  # Use GPU 0, set to null for CPU
 
 # Professional training parameters
 max_epochs: 10              # 10 Number of training epochs
-batch_size: 8              # 16 Batch size - adjust based on GPU memory
+batch_size: 16              # 16 Batch size - adjust based on GPU memory
 shuffle: true               # true Shuffle dataset for better training
 max_training_images: 64  # null for all images, or specify number like 1000
 random_seed: 42             # For reproducible results
@@ -21,13 +21,17 @@ save_interval: 5            # Save loss history every N batches
 resume: false               # Resume from previous training
 
 # Image processing
-image_size: [500, 500]      # Target image size (height, width)
+image_size: [200, 200]      # Target image size (height, width)
 
-# Dataset paths
-annotation_path: "dataset/vehicle_coco2017/annotations/instances_vehicle_train2017.json"
-image_directory: "dataset/vehicle_coco2017/images/train2017"
+# training input parameters
+# annotation_path: "dataset/vehicle_coco2017/annotations/instances_vehicle_train2017.json"
+# image_directory: "dataset/vehicle_coco2017/images/train2017"
+training_annotation_path: "dataset/vehicle_images_5/annotations/vehicle_5_per_class.json"
+training_image_directory: "dataset/vehicle_images_5/images"
+config_file: "mmdetection/configs/faster_rcnn/faster-rcnn_r101_fpn_1x_coco-dpatch.py"
+checkpoint_file: "mmdetection/weights/faster_rcnn_r101_fpn_1x_coco.pth"
 
-# Output directories
+# training output parameters
 training_output_dir: "results/dpatch_fasterrcnn/training_output"
 training_visualization_dir: "results/dpatch_fasterrcnn/training_output/visualization"
 training_images_save_dir: "results/dpatch_fasterrcnn/training_output/images"
@@ -35,13 +39,10 @@ training_comparison_dir: "results/dpatch_fasterrcnn/training_output/comparison"
 training_log_dir: "results/dpatch_fasterrcnn/training_output/log"
 training_patch_dir: "results/dpatch_fasterrcnn/training_output/patch"
 
-# Model configuration
-config_file: "mmdetection/configs/faster_rcnn/faster-rcnn_r101_fpn_1x_coco-dpatch.py"
-checkpoint_file: "mmdetection/weights/faster_rcnn_r101_fpn_1x_coco.pth"
-
-# Training control
-image_file: "dataset/vehicle_images_5/images/000000000471.jpg"  # For testing
-"test_output_dir": "results/dpatch_fasterrcnn/test_output"
+# test parameters
+test_image_file: "dataset/vehicle_images_5/images/000000000471.jpg"  # For testing
+test_annotation_path: "dataset/vehicle_images_5/annotations/vehicle_5_per_class.json"
+test_output_dir: "results/dpatch_fasterrcnn/test_output"
 
 # Advanced options (commented out)
 # crop_range: [0, 0]
