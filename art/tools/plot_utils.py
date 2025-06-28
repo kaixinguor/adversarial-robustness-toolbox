@@ -57,6 +57,247 @@ def plot_image_with_boxes(img, boxes, pred_cls, title, scores=None):
     plt.tight_layout()
     plt.show()
 
+def draw_detection_box(axe, img, title, detections, class_names, colors, is_gt=False):
+
+    axe.imshow(img)
+    axe.set_title(title, fontsize=14, weight='bold')
+    axe.axis('off')
+
+    # Draw detection results on patched image
+    boxes = detections["boxes"]
+    labels = detections["labels"]
+    scores = detections["scores"]
+    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
+        
+        x_min, y_min, x_max, y_max = bbox
+        
+        # Get class name
+        if class_names and 0 <= label < len(class_names):
+            class_name = class_names[label]
+        else:
+            class_name = f"class_{label}"
+        
+        color = colors[label % len(colors)]
+        
+        # Draw bounding box
+        rect = patches.Rectangle(
+            (x_min, y_min), x_max - x_min, y_max - y_min,
+            linewidth=2, edgecolor=color, facecolor='none'
+        )
+        axe.add_patch(rect)
+        
+        # Add label with score
+        if is_gt:
+            axe.text(x_min, y_min - 5, f"{class_name} (GT)", 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                fontsize=10, color='white', weight='bold')
+        else:
+            axe.text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
+                            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                            fontsize=10, color='white', weight='bold')
+        
+# def visualize_attack_comparison(
+#     processed_image: np.ndarray,
+#     processed_annotations: np.ndarray,
+#     patched_image: np.ndarray,
+#     original_detections: np.ndarray,
+#     patched_detections: np.ndarray,
+#     class_names: List[str] = None,
+#     save_dir: str = None,
+#     score_thresh: float=0.3
+# ) -> None:
+#     """
+#     Visualize attack comparison: original vs patched image with annotations and detection results.
+    
+#     Args:
+#         processed_image: Processed image array in BGR format [H,W,C]
+#         processed_annotations: Ground truth annotations
+#         patched_image: Patched image array in BGR format [H,W,C]
+#         original_detections: Detection results on original image
+#         patched_detections: Detection results on patched image
+#         class_names: List of class names
+#         save_dir: Directory to save the comparison image
+#     """
+#     # Convert BGR to RGB for visualization
+#     processed_image_rgb = processed_image[..., ::-1].copy()  # BGR to RGB
+#     patched_image_rgb = patched_image[..., ::-1].copy()  # BGR to RGB
+    
+#     # Ensure image values are in valid range for matplotlib
+#     processed_image_rgb = np.clip(processed_image_rgb, 0, 255).astype(np.uint8)
+#     patched_image_rgb = np.clip(patched_image_rgb, 0, 255).astype(np.uint8)
+
+#     img_height, img_width = processed_image_rgb.shape[:2]
+#     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    
+#     # Define colors
+#     colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
+    
+#     # Plot 1: Original image with ground truth annotations
+#     axes[0, 0].imshow(processed_image_rgb)
+#     axes[0, 0].set_title('Original Image (Ground Truth)', fontsize=14, weight='bold')
+#     axes[0, 0].axis('off')
+    
+#     # Draw ground truth annotations
+#     boxes = processed_annotations["boxes"]
+#     labels = processed_annotations["labels"]
+#     scores = processed_annotations["scores"]
+#     for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
+#         x_min, y_min, x_max, y_max = bbox
+        
+#         # Check bounds
+#         x_min = max(0, min(x_min, img_width))
+#         y_min = max(0, min(y_min, img_height))
+#         x_max = max(0, min(x_max, img_width))
+#         y_max = max(0, min(y_max, img_height))
+        
+#         # Get class name
+#         if class_names and 0 <= label < len(class_names):
+#             class_name = class_names[label]
+#         else:
+#             class_name = f"class_{label}"
+        
+#         color = colors[label % len(colors)]
+        
+#         # Draw bounding box
+#         rect = patches.Rectangle(
+#             (x_min, y_min), x_max - x_min, y_max - y_min,
+#             linewidth=2, edgecolor=color, facecolor='none'
+#         )
+#         axes[0, 0].add_patch(rect)
+        
+#         # Add label
+#         axes[0, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
+#                         bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+#                         fontsize=10, color='white', weight='bold')
+    
+#     # Plot 2: Original image with detection results
+#     axes[0, 1].imshow(processed_image_rgb)
+#     axes[0, 1].set_title('Original Image (Detection Results)', fontsize=14, weight='bold')
+#     axes[0, 1].axis('off')
+    
+#     # Draw detection results on original image
+#     boxes = original_detections["boxes"]
+#     labels = original_detections["labels"]
+#     scores = original_detections["scores"]
+#     for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
+#         if score < score_thresh:
+#             continue
+#         x_min, y_min, x_max, y_max = bbox
+        
+#         # Get class name
+#         if class_names and 0 <= label < len(class_names):
+#             class_name = class_names[label]
+#         else:
+#             class_name = f"class_{label}"
+        
+#         color = colors[label % len(colors)]
+        
+#         # Draw bounding box
+#         rect = patches.Rectangle(
+#             (x_min, y_min), x_max - x_min, y_max - y_min,
+#             linewidth=2, edgecolor=color, facecolor='none'
+#         )
+#         axes[0, 1].add_patch(rect)
+        
+#         # Add label with score
+#         axes[0, 1].text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
+#                         bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+#                         fontsize=10, color='white', weight='bold')
+    
+#     # Plot 3: Patched image with ground truth annotations
+#     axes[1, 0].imshow(patched_image_rgb)
+#     axes[1, 0].set_title('Patched Image (Ground Truth)', fontsize=14, weight='bold')
+#     axes[1, 0].axis('off')
+    
+#     # Draw ground truth annotations on patched image
+#     boxes = processed_annotations["boxes"]
+#     labels = processed_annotations["labels"]
+#     scores = processed_annotations["scores"]
+#     for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
+#         x_min, y_min, x_max, y_max = bbox
+        
+#         # Check bounds
+#         x_min = max(0, min(x_min, img_width))
+#         y_min = max(0, min(y_min, img_height))
+#         x_max = max(0, min(x_max, img_width))
+#         y_max = max(0, min(y_max, img_height))
+        
+#         # Get class name
+#         if class_names and 0 <= label < len(class_names):
+#             class_name = class_names[label]
+#         else:
+#             class_name = f"class_{label}"
+        
+#         color = colors[label % len(colors)]
+        
+#         # Draw bounding box
+#         rect = patches.Rectangle(
+#             (x_min, y_min), x_max - x_min, y_max - y_min,
+#             linewidth=2, edgecolor=color, facecolor='none'
+#         )
+#         axes[1, 0].add_patch(rect)
+        
+#         # Add label
+#         axes[1, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
+#                         bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+#                         fontsize=10, color='white', weight='bold')
+    
+#     # Plot 4: Patched image with detection results
+#     axes[1, 1].imshow(patched_image_rgb)
+#     axes[1, 1].set_title('Patched Image (Detection Results)', fontsize=14, weight='bold')
+#     axes[1, 1].axis('off')
+    
+#     # Draw detection results on patched image
+#     boxes = patched_detections["boxes"]
+#     labels = patched_detections["labels"]
+#     scores = patched_detections["scores"]
+#     for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
+        
+#         x_min, y_min, x_max, y_max = bbox
+        
+#         # Get class name
+#         if class_names and 0 <= label < len(class_names):
+#             class_name = class_names[label]
+#         else:
+#             class_name = f"class_{label}"
+        
+#         color = colors[label % len(colors)]
+        
+#         # Draw bounding box
+#         rect = patches.Rectangle(
+#             (x_min, y_min), x_max - x_min, y_max - y_min,
+#             linewidth=2, edgecolor=color, facecolor='none'
+#         )
+#         axes[1, 1].add_patch(rect)
+        
+#         # Add label with score
+#         axes[1, 1].text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
+#                         bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+#                         fontsize=10, color='white', weight='bold')
+    
+#     # Print attack summary
+#     print(f"\n=== Attack Summary ===")
+#     print(f"Number of ground truth targets: {len(processed_annotations['boxes'])}")
+#     print(f"Original image detections: {len(original_detections['boxes'])}")
+#     print(f"Patched image detections: {len(patched_detections['boxes'])}")
+    
+#     # Calculate attack effectiveness
+#     if len(original_detections['boxes']) > 0:
+#         detection_change = len(patched_detections['boxes']) - len(original_detections['boxes'])
+#         detection_reduction = (len(original_detections['boxes']) - len(patched_detections['boxes'])) / len(original_detections['boxes']) * 100
+#         print(f"Detection count change: {detection_change:+d}")
+#         print(f"Detection reduction: {detection_reduction:.1f}%")
+
+#     plt.tight_layout()
+    
+#     # Use timestamp for unique filename
+#     timestamp = int(time.time())
+#     save_path = os.path.join(save_dir, f"attack_comparison_{timestamp}.png")
+#     plt.savefig(save_path, dpi=150, bbox_inches='tight')
+#     print(f"Attack comparison saved to: {save_path}")
+  
+#     plt.close()
+
 def visualize_attack_comparison(
     processed_image: np.ndarray,
     processed_annotations: np.ndarray,
@@ -98,141 +339,40 @@ def visualize_attack_comparison(
     axes[0, 0].axis('off')
     
     # Draw ground truth annotations
-    boxes = processed_annotations["boxes"]
-    labels = processed_annotations["labels"]
-    scores = processed_annotations["scores"]
-    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
-        x_min, y_min, x_max, y_max = bbox
-        
-        # Check bounds
-        x_min = max(0, min(x_min, img_width))
-        y_min = max(0, min(y_min, img_height))
-        x_max = max(0, min(x_max, img_width))
-        y_max = max(0, min(y_max, img_height))
-        
-        # Get class name
-        if class_names and 0 <= label < len(class_names):
-            class_name = class_names[label]
-        else:
-            class_name = f"class_{label}"
-        
-        color = colors[label % len(colors)]
-        
-        # Draw bounding box
-        rect = patches.Rectangle(
-            (x_min, y_min), x_max - x_min, y_max - y_min,
-            linewidth=2, edgecolor=color, facecolor='none'
-        )
-        axes[0, 0].add_patch(rect)
-        
-        # Add label
-        axes[0, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                        fontsize=10, color='white', weight='bold')
-    
+    draw_detection_box(axes[0,0], 
+                       processed_image_rgb,
+                       'Original Image (Ground Truth)',
+                       processed_annotations,
+                       class_names,
+                       colors,
+                       is_gt=True)
+                       
     # Plot 2: Original image with detection results
-    axes[0, 1].imshow(processed_image_rgb)
-    axes[0, 1].set_title('Original Image (Detection Results)', fontsize=14, weight='bold')
-    axes[0, 1].axis('off')
-    
-    # Draw detection results on original image
-    boxes = original_detections["boxes"]
-    labels = original_detections["labels"]
-    scores = original_detections["scores"]
-    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
-        
-        x_min, y_min, x_max, y_max = bbox
-        
-        # Get class name
-        if class_names and 0 <= label < len(class_names):
-            class_name = class_names[label]
-        else:
-            class_name = f"class_{label}"
-        
-        color = colors[label % len(colors)]
-        
-        # Draw bounding box
-        rect = patches.Rectangle(
-            (x_min, y_min), x_max - x_min, y_max - y_min,
-            linewidth=2, edgecolor=color, facecolor='none'
-        )
-        axes[0, 1].add_patch(rect)
-        
-        # Add label with score
-        axes[0, 1].text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                        fontsize=10, color='white', weight='bold')
+    draw_detection_box(axes[0,1], 
+                       processed_image_rgb,
+                       'Original Image (Detection Results)',
+                       original_detections,
+                       class_names,
+                       colors,
+                       is_gt=False)
     
     # Plot 3: Patched image with ground truth annotations
-    axes[1, 0].imshow(patched_image_rgb)
-    axes[1, 0].set_title('Patched Image (Ground Truth)', fontsize=14, weight='bold')
-    axes[1, 0].axis('off')
-    
-    # Draw ground truth annotations on patched image
-    boxes = processed_annotations["boxes"]
-    labels = processed_annotations["labels"]
-    scores = processed_annotations["scores"]
-    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
-        x_min, y_min, x_max, y_max = bbox
-        
-        # Check bounds
-        x_min = max(0, min(x_min, img_width))
-        y_min = max(0, min(y_min, img_height))
-        x_max = max(0, min(x_max, img_width))
-        y_max = max(0, min(y_max, img_height))
-        
-        # Get class name
-        if class_names and 0 <= label < len(class_names):
-            class_name = class_names[label]
-        else:
-            class_name = f"class_{label}"
-        
-        color = colors[label % len(colors)]
-        
-        # Draw bounding box
-        rect = patches.Rectangle(
-            (x_min, y_min), x_max - x_min, y_max - y_min,
-            linewidth=2, edgecolor=color, facecolor='none'
-        )
-        axes[1, 0].add_patch(rect)
-        
-        # Add label
-        axes[1, 0].text(x_min, y_min - 5, f"{class_name} (GT)", 
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                        fontsize=10, color='white', weight='bold')
+    draw_detection_box(axes[1,0], 
+                       patched_image_rgb,
+                       'Patched Image (Ground Truth)',
+                       processed_annotations,
+                       class_names,
+                       colors,
+                       is_gt=True)
     
     # Plot 4: Patched image with detection results
-    axes[1, 1].imshow(patched_image_rgb)
-    axes[1, 1].set_title('Patched Image (Detection Results)', fontsize=14, weight='bold')
-    axes[1, 1].axis('off')
-    
-    # Draw detection results on patched image
-    boxes = patched_detections["boxes"]
-    labels = patched_detections["labels"]
-    scores = patched_detections["scores"]
-    for i, (bbox, label, score) in enumerate(zip(boxes, labels, scores)):
-        
-        x_min, y_min, x_max, y_max = bbox
-        
-        # Get class name
-        if class_names and 0 <= label < len(class_names):
-            class_name = class_names[label]
-        else:
-            class_name = f"class_{label}"
-        
-        color = colors[label % len(colors)]
-        
-        # Draw bounding box
-        rect = patches.Rectangle(
-            (x_min, y_min), x_max - x_min, y_max - y_min,
-            linewidth=2, edgecolor=color, facecolor='none'
-        )
-        axes[1, 1].add_patch(rect)
-        
-        # Add label with score
-        axes[1, 1].text(x_min, y_min - 5, f"{class_name} ({score:.2f})", 
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                        fontsize=10, color='white', weight='bold')
+    draw_detection_box(axes[1,1], 
+                       patched_image_rgb,
+                       'Patched Image (Detection Results)',
+                       patched_detections,
+                       class_names,
+                       colors,
+                       is_gt=False)
     
     # Print attack summary
     print(f"\n=== Attack Summary ===")

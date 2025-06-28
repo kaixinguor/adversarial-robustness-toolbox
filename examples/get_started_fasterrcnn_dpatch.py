@@ -123,7 +123,8 @@ def attack_test(config):
     )
 
     attack = DPatch(
-        frcnn
+        frcnn,
+        output_dir=config["test_output_dir"]
     )
         
     # Get image filename from path
@@ -170,7 +171,7 @@ def attack_test(config):
         original_detections=predictions[0],
         patched_detections=predictions_adv[0],
         class_names=COCO90_NAMES,
-        save_dir=config["test_output_dir"]
+        save_dir=config["test_output_dir"],
     )
 
     attack.close()
