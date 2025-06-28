@@ -67,6 +67,7 @@ def coco_resize_bboxes(bboxes, original_size, new_size):
     bboxes = np.array(bboxes)
     bboxes[:,2] = bboxes[:,0] + bboxes[:,2]
     bboxes[:,3] = bboxes[:,1] + bboxes[:,3]
+    
     orig_w, orig_h = original_size
     new_w, new_h = new_size
 
@@ -78,10 +79,43 @@ def coco_resize_bboxes(bboxes, original_size, new_size):
 
     return bboxes
 
+# def get_original_annotations(
+#     image_path: str,
+#     file_to_annotations: Dict[str, List[Dict]]
+# ) -> List[Tuple]:
+#     """
+#     Get original annotations for an image without any scaling or preprocessing.
+    
+#     Args:
+#         image_path: Path to the image file
+#         file_to_annotations: Mapping from filename to annotations
+        
+#     Returns:
+#         List of (bbox, label) tuples in original image coordinates
+#     """
+#     filename = os.path.basename(image_path)
+#     annotations = file_to_annotations.get(filename, [])
+    
+#     # Convert annotations to the format expected by visualization
+#     processed_annotations = []
+#     for annotation in annotations:
+#         bbox = annotation['bbox']  # [x, y, w, h] format
+#         label = annotation['category_id']
+        
+#         # Convert [x, y, w, h] to [x_min, y_min, x_max, y_max]
+#         x_min, y_min, w, h = bbox
+#         x_max = x_min + w
+#         y_max = y_min + h
+        
+#         # Map COCO label to vehicle label if needed
+#         mapped_label = coco_label_mapping(label)
+        
+#         processed_annotations.append(([x_min, y_min, x_max, y_max], mapped_label))
+    
+    # return processed_annotations
 
-def get_original_annotations(
-    image_path: str,
-    file_to_annotations: Dict[str, List[Dict]]
+def get_coco80_annotations(
+    annotations: List[Dict]
 ) -> List[Tuple]:
     """
     Get original annotations for an image without any scaling or preprocessing.
@@ -93,8 +127,6 @@ def get_original_annotations(
     Returns:
         List of (bbox, label) tuples in original image coordinates
     """
-    filename = os.path.basename(image_path)
-    annotations = file_to_annotations.get(filename, [])
     
     # Convert annotations to the format expected by visualization
     processed_annotations = []

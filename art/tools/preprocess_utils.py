@@ -6,8 +6,10 @@ from PIL import Image
 import random
 
 
-from art.tools.coco_tools import coco_resize_bboxes, coco_label_mapping
-
+from art.tools.coco_tools import coco_resize_bboxes, get_coco80_annotations
+from art.tools.plot_utils import visualize_original_annotations
+from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES as COCO80_NAMES
+import logging
 
 SUPPORTED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
 MAX_TRAINING_IMAGES = 10 # TODO: 修改迭代器
@@ -27,7 +29,8 @@ class BatchDataLoader:
         image_size: Tuple[int, int] = IMAGE_SIZE,
         shuffle: bool = True,
         max_images: Optional[int] = None,
-        seed: Optional[int] = None
+        seed: Optional[int] = None,
+        channels_first: bool = True
     ):
         """
         Initialize the batch data loader.
@@ -40,6 +43,8 @@ class BatchDataLoader:
             shuffle: Whether to shuffle the dataset
             max_images: Maximum number of images to use (None for all)
             seed: Random seed for reproducibility
+            channel_first: Whether to output images in channel-first format [C,H,W] (True) 
+                          or channel-last format [H,W,C] (False)
         """
         self.images_dir = images_dir
         self.file_to_annotations = file_to_annotations
@@ -48,6 +53,7 @@ class BatchDataLoader:
         self.shuffle = shuffle
         self.max_images = max_images
         self.seed = seed
+        self.channel_first = channels_first
         
         # Initialize transform
         self.transform = transforms.Resize(image_size)
@@ -66,6 +72,10 @@ class BatchDataLoader:
         print(f"  - Batch size: {self.batch_size}")
         print(f"  - Number of batches: {self.num_batches}")
         print(f"  - Image size: {image_size}")
+        print(f"  - Channel format: {'First [C,H,W]' if channels_first else 'Last [H,W,C]'}")
+
+        print(f"training file names: {self.image_files}")
+
     
     def _get_valid_image_files(self) -> List[str]:
         """Get list of image files that have annotations."""
@@ -119,7 +129,7 @@ class BatchDataLoader:
         for filename in batch_files:
             try:
                 image_array, annotations = process_image_file(
-                    filename, self.images_dir, self.transform, self.file_to_annotations
+                    filename, self.images_dir, self.transform, self.file_to_annotations, self.channel_first
                 )
                 
                 if annotations and len(annotations['boxes']) > 0:
@@ -137,6 +147,49 @@ class BatchDataLoader:
         images_batch = np.stack(batch_images)
         
         return images_batch, batch_annotations
+    
+    def visualize_annotated_images(self, save_dir, max_images=5):
+        """Visualize images with their annotations."""
+            
+        print(f"\nVisualizing images (up to {max_images})...")
+        
+        # Create visualization directory
+        os.makedirs(save_dir, exist_ok=True)
+ 
+        for image_count, filename in enumerate(self.image_files[:max_images]):
+
+            image_path = os.path.join(self.images_dir, filename)
+            original_annotations = self.file_to_annotations.get(filename,[])
+
+            annotations = get_coco80_annotations(original_annotations)
+            
+            if not annotations:  # Only visualize images with annotations
+                print(f"Warning: image {filename} does not have annotations. Skip for visualization!")
+                continue
+     
+            print(f"Visualizing training image {image_count+1}: {filename}")
+            save_path = os.path.join(save_dir, f'training_image_{image_count+1}_{os.path.splitext(filename)[0]}.png')
+            self._visualize_single_image(
+                image_path=image_path,
+                annotations=annotations,
+                save_path=save_path
+            )
+
+    def _visualize_single_image(self, image_path: str, annotations: List[Tuple], save_path: str):
+        """
+        Visualize a single image with its annotations.
+        
+        Args:
+            image_path: Path to the image file
+            annotations: List of (bbox, label) tuples
+            save_path: Path to save the visualization
+        """
+        visualize_original_annotations(
+            image_path=image_path,
+            annotations=annotations,
+            class_names=COCO80_NAMES,
+            save_path=save_path
+        )
 
 def create_batch_loader(
     images_dir: str,
@@ -145,7 +198,8 @@ def create_batch_loader(
     image_size: Tuple[int, int] = IMAGE_SIZE,
     shuffle: bool = True,
     max_images: Optional[int] = None,
-    seed: Optional[int] = None
+    seed: Optional[int] = None,
+    channels_first: bool = True
 ) -> BatchDataLoader:
     """
     Create a batch data loader for training.
@@ -158,6 +212,8 @@ def create_batch_loader(
         shuffle: Whether to shuffle the dataset
         max_images: Maximum number of images to use (None for all)
         seed: Random seed for reproducibility
+        channels_first: Whether to output images in channel-first format [C,H,W] (True) 
+                      or channel-last format [H,W,C] (False)
         
     Returns:
         BatchDataLoader instance
@@ -169,61 +225,69 @@ def create_batch_loader(
         image_size=image_size,
         shuffle=shuffle,
         max_images=max_images,
-        seed=seed
+        seed=seed,
+        channels_first=channels_first
     )
 
-def load_training_images(
-    images_dir: str, 
-    file_to_annotations: Dict[str, List[Dict]],
-    max_images: int = MAX_TRAINING_IMAGES
-) -> Tuple[np.ndarray, List[List[Tuple]]]:
-    """
-    Load and process multiple images for training.
+# def load_training_images(
+#     images_dir: str, 
+#     file_to_annotations: Dict[str, List[Dict]],
+#     max_images: int = MAX_TRAINING_IMAGES,
+#     channel_first: bool = True
+# ) -> Tuple[np.ndarray, List[List[Tuple]]]:
+#     """
+#     Load and process multiple images for training.
     
-    Args:
-        images_dir: Directory containing image files
-        file_to_annotations: Mapping from filename to annotations
-        max_images: Maximum number of images to load for training
+#     Args:
+#         images_dir: Directory containing image files
+#         file_to_annotations: Mapping from filename to annotations
+#         max_images: Maximum number of images to load for training
+#         channel_first: Whether to output images in channel-first format [C,H,W] (True) 
+#                       or channel-last format [H,W,C] (False)
         
-    Returns:
-        Tuple of (stacked images array, list of annotations for each image)
-    """
-    transform = transforms.Resize(IMAGE_SIZE)
+#     Returns:
+#         Tuple of (stacked images array, list of annotations for each image)
+#     """
+#     transform = transforms.Resize(IMAGE_SIZE)
     
-    processed_images = []
-    all_annotations = []
-    image_count = 0
-    
-    for filename in sorted(os.listdir(images_dir)):
-        if image_count >= max_images:
-            break
+#     processed_images = []
+#     all_annotations = []
+#     image_count = 0
+
+#     training_filenames = []
+#     for filename in sorted(os.listdir(images_dir)):
+#         if image_count >= max_images:
+#             break
             
-        if filename.lower().endswith(SUPPORTED_EXTENSIONS):
-            image_array, annotations = process_image_file(
-                filename, images_dir, transform, file_to_annotations
-            )
+#         if filename.lower().endswith(SUPPORTED_EXTENSIONS):
+#             image_array, annotations = process_image_file(
+#                 filename, images_dir, transform, file_to_annotations, channel_first
+#             )
             
-            # Only include images with annotations for training
-            if annotations:
-                processed_images.append(image_array)
-                all_annotations.append(annotations)
-                image_count += 1
-                print(f"Loaded training image {image_count}: {filename} ({len(annotations['boxes'])} objects)")
+#             # Only include images with annotations for training
+#             if annotations:
+#                 processed_images.append(image_array)
+#                 all_annotations.append(annotations)
+#                 image_count += 1
+#                 print(f"Loaded training image {image_count}: {filename} ({len(annotations['boxes'])} objects)")
+#                 training_filenames.append(filename)
     
-    # Stack all images into a single array with shape [B,C,H,W]
-    if processed_images:
-        images_batch = np.stack(processed_images)
-        print(f"Training batch created: {len(processed_images)} images")
-    else:
-        raise ValueError("No images with annotations found for training")
+#     # Stack all images into a single array with shape [B,C,H,W] or [B,H,W,C]
+#     if processed_images:
+#         images_batch = np.stack(processed_images)
+#         print(f"Training batch created: {len(processed_images)} images")
+#         print(f"Image format: {'[B,C,H,W]' if channel_first else '[B,H,W,C]'}")
+#     else:
+#         raise ValueError("No images with annotations found for training")
     
-    return images_batch, all_annotations
+#     return images_batch, all_annotations, training_filenames
 
 def process_image_file(
     filename: str, 
     images_dir: str, 
     transform: transforms.Compose,
-    file_to_annotations: Dict[str, List[Dict]]
+    file_to_annotations: Dict[str, List[Dict]],
+    channels_first: bool = True
 ) -> Tuple[np.ndarray, List[Tuple]]:
     """
     Process a single image file and extract its annotations.
@@ -233,6 +297,8 @@ def process_image_file(
         images_dir: Directory containing images
         transform: Image transformation pipeline
         file_to_annotations: Mapping from filename to annotations
+        channel_first: Whether to output images in channel-first format [C,H,W] (True) 
+                      or channel-last format [H,W,C] (False)
         
     Returns:
         Tuple of (processed image array, list of (bbox, label) tuples)
@@ -248,7 +314,11 @@ def process_image_file(
     # Convert to numpy array and change to BGR format
     image_array = np.array(image).astype(np.float32)  # RGB [H,W,C]
     image_array = image_array[..., ::-1]  # Convert RGB to BGR
-    # image_array = np.transpose(image_array, (2, 0, 1))  # Shape: [C,H,W], range [0.0,255.0]
+    
+    # Apply channel format based on parameter
+    if channels_first:
+        image_array = np.transpose(image_array, (2, 0, 1))  # Shape: [C,H,W], range [0.0,255.0]
+    # If channels_first=False, keep as [H,W,C] format
     
     # Process annotations for this image
     annotations = file_to_annotations.get(filename, [])

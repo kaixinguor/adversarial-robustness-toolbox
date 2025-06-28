@@ -39,6 +39,8 @@ from art.estimators.object_detection.object_detector import ObjectDetectorMixin
 from art import config
 from torch.utils.tensorboard import SummaryWriter
 
+from art.tools.patch_utils import save_patch
+
 if TYPE_CHECKING:
     from art.utils import OBJECT_DETECTOR_TYPE
 
@@ -65,12 +67,12 @@ class DPatch(EvasionAttack):
     def __init__(
         self,
         estimator: "OBJECT_DETECTOR_TYPE",
-        patch_shape: tuple[int, int, int] = (40, 40, 3),
+        patch_shape: tuple[int, int, int] = (3, 40, 40),
         learning_rate: float = 5.0,
-        max_iter: int = 1,
-        batch_size: int = 16,
+        max_iter: int = 100,
+        batch_size: int = 1,
         verbose: bool = True,
-        log_dir: str = None,
+        output_dir: str = "output",
     ):
         """
         Create an instance of the :class:`.DPatch`.
@@ -85,8 +87,15 @@ class DPatch(EvasionAttack):
         """
         super().__init__(estimator=estimator)
 
-        # 设置对抗补丁的形状
-        self.patch_shape = patch_shape
+        # 设置对抗补丁的形状 - 根据estimator的channels_first调整
+        if estimator.channels_first:
+            # 如果estimator使用channels_first，patch_shape应该是 (C, H, W)
+            self.patch_shape = patch_shape
+        else:
+            # 如果estimator使用channels_last，patch_shape应该是 (H, W, C)
+            # 将 (C, H, W) 转换为 (H, W, C)
+            self.patch_shape = (patch_shape[1], patch_shape[2], patch_shape[0])
+        
         # 设置优化算法的学习率
         self.learning_rate = learning_rate
         # 设置优化算法的最大迭代次数
@@ -100,11 +109,11 @@ class DPatch(EvasionAttack):
 
         # 如果估计器的裁剪值是None，则将对抗补丁初始化为全零
         if self.estimator.clip_values is None:
-            self._patch = np.zeros(shape=patch_shape, dtype=config.ART_NUMPY_DTYPE)
+            self._patch = np.zeros(shape=self.patch_shape, dtype=config.ART_NUMPY_DTYPE)
         # 否则，将对抗补丁初始化为随机值，范围在估计器的裁剪值之间
         else:
             self._patch = (
-                np.random.randint(0, 255, size=patch_shape)
+                np.random.randint(0, 255, size=self.patch_shape)
                 / 255
                 * (self.estimator.clip_values[1] - self.estimator.clip_values[0])
                 + self.estimator.clip_values[0]
@@ -112,11 +121,15 @@ class DPatch(EvasionAttack):
 
         # 设置目标标签
         self.target_label: int | np.ndarray | list[int] | None = []
+
+        # 设置输出路径
+        os.makedirs(output_dir, exist_ok=True)
+        self.output_dir = output_dir
+
         # 设置TensorBoard日志写入器
-        self.writer = None
-        if log_dir is not None:
-            os.makedirs(log_dir, exist_ok=True)
-            self.writer = SummaryWriter(log_dir=log_dir)
+        log_dir = os.path.join(output_dir,"log")
+        os.makedirs(log_dir, exist_ok=True)
+        self.writer = SummaryWriter(log_dir=log_dir) 
 
     def generate(
         self,
@@ -178,7 +191,7 @@ class DPatch(EvasionAttack):
         patched_images, transforms = self._augment_images_with_patch(
             x,
             self._patch,
-            random_location=True,
+            random_location=False,
             channels_first=self.estimator.channels_first,
             mask=mask,
             transforms=None,
@@ -226,24 +239,26 @@ class DPatch(EvasionAttack):
                 patch_target.append(target_dict)
 
         for i_step in trange(self.max_iter, desc="DPatch iteration", disable=not self.verbose):
-            if i_step == 0 or (i_step + 1) % 10 == 0:
-                logger.info("Training Step: %i", i_step + 1)
+            # if i_step == 0 or (i_step + 1) % 10 == 0:
+            #     logger.info("Training Step: %i", i_step + 1)
 
-                losses = self.estimator.compute_losses(patched_images, patch_target)
-                loss_str = ', '.join([f"{k}: {v}" for k, v in losses.items()])
-                logger.info(f"[DPatch] Step {i_step+1} Losses: {loss_str}")
-                if self.writer is not None:
-                    for k, v in losses.items():
-                        self.writer.add_scalar(f"Loss/{k}", v, i_step+1)
+            #     losses = self.estimator.compute_losses(patched_images, patch_target)
+            #     loss_str = ', '.join([f"{k}: {v}" for k, v in losses.items()])
+            #     logger.info(f"[DPatch] Step {i_step+1} Losses: {loss_str}")
+            #     if self.writer is not None:
+            #         for k, v in losses.items():
+            #             self.writer.add_scalar(f"Loss/{k}", v, i_step+1)
                    
             num_batches = math.ceil(x.shape[0] / self.batch_size)
             patch_gradients = np.zeros_like(self._patch)
+            loss_sum = 0
 
             for i_batch in range(num_batches):
                 i_batch_start = i_batch * self.batch_size
                 i_batch_end = min((i_batch + 1) * self.batch_size, patched_images.shape[0])
 
-                gradients = self.estimator.loss_gradient(
+                self.estimator.model.train()
+                loss, gradients = self.estimator.loss_gradient(
                     x=patched_images[i_batch_start:i_batch_end],
                     y=patch_target[i_batch_start:i_batch_end],
                     standardise_output=True,
@@ -262,12 +277,17 @@ class DPatch(EvasionAttack):
                         patch_gradients_i = gradients[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :]
 
                     patch_gradients = patch_gradients + patch_gradients_i
+                    loss_sum += loss
 
-            if self.target_label:
+            """Update patch based on gradients and attack type."""
+            if self.target_label is not None:
+                # Target attack: minimize loss (approach ground truth)
                 self._patch = self._patch - np.sign(patch_gradients) * self.learning_rate
             else:
+                # Untargeted attack: maximize loss (move away from ground truth)
                 self._patch = self._patch + np.sign(patch_gradients) * self.learning_rate
 
+            # Clip values to valid range
             if self.estimator.clip_values is not None:
                 self._patch = np.clip(
                     self._patch,
@@ -291,6 +311,14 @@ class DPatch(EvasionAttack):
                 mask=mask,
                 transforms=None,
             )
+
+            # simple log
+            avg_loss = loss_sum / self.batch_size
+            logger.info(f"Iteration {i_step + 1}, Average loss: {avg_loss:.4f}")
+            if (i_step+1)%10==0:
+                temp_patch_out = os.path.join(self.output_dir, "patch")
+                os.makedirs(temp_patch_out, exist_ok=True)
+                save_patch(self._patch, temp_patch_out, f'iteration_{i_step + 1}',channels_first=self.estimator.channels_first)
 
         return self._patch
 
@@ -330,6 +358,10 @@ class DPatch(EvasionAttack):
         if channels_first:
             x_copy = np.transpose(x_copy, (0, 2, 3, 1))
             patch_copy = np.transpose(patch_copy, (1, 2, 0))
+
+        # Debug information
+        print(f"Debug - x_copy shape: {x_copy.shape}, patch_copy shape: {patch_copy.shape}")
+        print(f"Debug - channels_first: {channels_first}")
 
         for i_image in range(x.shape[0]):
 
@@ -377,10 +409,16 @@ class DPatch(EvasionAttack):
                 i_y_1 = transforms[i_image]["i_y_1"]
                 i_y_2 = transforms[i_image]["i_y_2"]
 
+            # Debug information for the specific slice
+            print(f"Debug - Slice indices: i_x_1={i_x_1}, i_x_2={i_x_2}, i_y_1={i_y_1}, i_y_2={i_y_2}")
+            print(f"Debug - Slice shape: {x_copy[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :].shape}")
+            print(f"Debug - Patch shape: {patch_copy.shape}")
+
             x_copy[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :] = patch_copy
 
+        # Convert back to original format
         if channels_first:
-            x_copy = np.transpose(x_copy, (0, 3, 1, 2))
+            x_copy = np.transpose(x_copy, (0, 3, 1, 2)) # N C H W 
 
         return x_copy, random_transformations
 

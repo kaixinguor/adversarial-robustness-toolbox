@@ -4,9 +4,6 @@ import numpy as np
 from typing import List
 import os
 import cv2
-from art.tools.coco_tools import get_original_annotations
-from art.tools.coco_categories80 import COCO_INSTANCE_CATEGORY_NAMES as COCO80_NAMES
-from art.tools.preprocess_utils import SUPPORTED_EXTENSIONS
 from typing import Dict, List
 import time
 
@@ -262,8 +259,8 @@ def visualize_attack_comparison(
 
 def visualize_original_annotations(
     image_path: str, 
-    file_to_annotations: Dict[str, List[Dict]],
-    class_names: List[str] = None, 
+    annotations: List[Dict],
+    class_names: List[str], 
     save_path: str = None
 ) -> None:
     """
@@ -272,13 +269,15 @@ def visualize_original_annotations(
     
     Args:
         image_path: Path to the image file
-        file_to_annotations: Mapping from filename to annotations
+        annotations: annotations on original data with format List of [x_min, y_min, x_max, y_max], label
         class_names: List of class names
         save_path: Save path, if None then display the image
+    """
     """
     # Get original annotations
     annotations = get_original_annotations(image_path, file_to_annotations)
     
+    """    
     # Read original image
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -295,7 +294,7 @@ def visualize_original_annotations(
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
     
     print(f"\n=== Original Annotation Info: {os.path.basename(image_path)} ===")
-    print(f"Number of detected objects: {len(annotations)}")
+    print(f"Number of annotated objects: {len(annotations)}")
     
     for i, (bbox, label) in enumerate(annotations):
         x_min, y_min, x_max, y_max = bbox
@@ -328,8 +327,7 @@ def visualize_original_annotations(
                 fontsize=10, color='white', weight='bold')
         
         # Print annotation info
-        print(f"Object {i+1}: {class_name} (ID: {label}) - BBox: [{x_min:.1f}, {y_min:.1f}, {x_max:.1f}, {y_max:.1f}]")
-        print(f"  BBox size: {x_max - x_min:.1f} x {y_max - y_min:.1f}")
+        print(f"Object {i+1}: {class_name} (ID: {label}) - BBox: [{x_min:.1f}, {y_min:.1f}, {x_max:.1f}, {y_max:.1f}], BBox size: {x_max - x_min:.1f} x {y_max - y_min:.1f}")
     
     ax.set_title(f'Original Image Annotations: {os.path.basename(image_path)}', fontsize=14, weight='bold')
     ax.axis('off')
@@ -345,49 +343,49 @@ def visualize_original_annotations(
     plt.close()
 
 
-def visualize_training_images(
-    images_directory: str,
-    file_to_annotations: Dict[str, List[Dict]],
-    save_directory: str,
-    max_images: int = 5
-) -> None:
-    """
-    Visualize training images with their annotations.
+# def visualize_training_images(
+#     images_directory: str,
+#     file_to_annotations: Dict[str, List[Dict]],
+#     save_directory: str,
+#     max_images: int = 5
+# ) -> None:
+#     """
+#     Visualize training images with their annotations.
     
-    Args:
-        images_directory: Directory containing image files
-        file_to_annotations: Mapping from filename to annotations
-        max_images: Maximum number of images to visualize
-    """
-    print(f"\nVisualizing training images (up to {max_images})...")
+#     Args:
+#         images_directory: Directory containing image files
+#         file_to_annotations: Mapping from filename to annotations
+#         max_images: Maximum number of images to visualize
+#     """
+#     print(f"\nVisualizing training images (up to {max_images})...")
     
-    # Create training images directory
-    os.makedirs(save_directory, exist_ok=True)
+#     # Create training images directory
+#     os.makedirs(save_directory, exist_ok=True)
     
-    image_count = 0
-    filename_list = sorted(os.listdir(images_directory))
-    for filename in filename_list:
-        if image_count >= max_images:
-            break
+#     image_count = 0
+#     filename_list = sorted(os.listdir(images_directory))
+#     for filename in filename_list:
+#         if image_count >= max_images:
+#             break
             
-        if not filename.lower().endswith(SUPPORTED_EXTENSIONS):
-            continue
+#         if not filename.lower().endswith(SUPPORTED_EXTENSIONS):
+#             continue
         
-        image_path = os.path.join(images_directory, filename)
+#         image_path = os.path.join(images_directory, filename)
         
-        # Get annotations for this image
-        annotations = get_original_annotations(image_path, file_to_annotations)
+#         # Get annotations for this image
+#         annotations = get_original_annotations(image_path, file_to_annotations)
         
-        if not annotations: # Only visualize images with annotations
-            print(f"Warning: image {filename} does not have annotations. Skip for visualizeation!")
-            continue
+#         if not annotations: # Only visualize images with annotations
+#             print(f"Warning: image {filename} does not have annotations. Skip for visualizeation!")
+#             continue
  
-        print(f"Visualizing training image {image_count+1}: {filename}")
-        save_path = os.path.join(save_directory, f'training_image_{image_count+1}.png')
-        visualize_original_annotations(
-            image_path=image_path,
-            file_to_annotations=file_to_annotations,
-            class_names=COCO80_NAMES,
-            save_path=save_path
-        )
-        image_count += 1
+#         print(f"Visualizing training image {image_count+1}: {filename}")
+#         save_path = os.path.join(save_directory, f'training_image_{image_count+1}.png')
+#         visualize_original_annotations(
+#             image_path=image_path,
+#             file_to_annotations=file_to_annotations,
+#             class_names=COCO80_NAMES,
+#             save_path=save_path
+#         )
+#         image_count += 1

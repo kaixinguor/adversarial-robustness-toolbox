@@ -393,7 +393,7 @@ class PyTorchObjectDetector(ObjectDetectorMixin, PyTorchEstimator):
 
         assert grads.shape == x.shape
 
-        return grads
+        return loss, grads
 
     def predict(self, x: np.ndarray, batch_size: int = 128, **kwargs) -> list[dict[str, np.ndarray]]:
         """
