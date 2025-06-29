@@ -257,7 +257,15 @@ class DPatch(EvasionAttack):
                 i_batch_start = i_batch * self.batch_size
                 i_batch_end = min((i_batch + 1) * self.batch_size, patched_images.shape[0])
 
-                loss, gradients = self.estimator.loss_gradient(
+                # 获取损失值
+                loss = self.estimator.compute_loss(
+                    x=patched_images[i_batch_start:i_batch_end],
+                    y=patch_target[i_batch_start:i_batch_end],
+                    standardise_output=True,
+                )
+
+                # 获取梯度
+                gradients = self.estimator.loss_gradient(
                     x=patched_images[i_batch_start:i_batch_end],
                     y=patch_target[i_batch_start:i_batch_end],
                     standardise_output=True,
@@ -276,7 +284,9 @@ class DPatch(EvasionAttack):
                         patch_gradients_i = gradients[i_image, i_x_1:i_x_2, i_y_1:i_y_2, :]
 
                     patch_gradients = patch_gradients + patch_gradients_i
-                    loss_sum += loss
+                    
+                    for k, v in loss.items():
+                        loss_sum += v
 
             """Update patch based on gradients and attack type."""
             if self.target_label is not None:
